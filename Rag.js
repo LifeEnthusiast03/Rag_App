@@ -12,6 +12,7 @@ const loader2 = YoutubeLoader.createFromUrl("https://www.youtube.com/watch?v=MOe
   language: "en",
   addVideoInfo: true,
 });
+
 const docs1 = await loader1.load();
 const docs2 = await loader2.load()
 
