@@ -22,6 +22,6 @@ parser = StrOutputParser()
 
 chain2 = chain1 | prompt | llm | parser
 
-result = chain2.invoke("what are the causes of soil degradation?")
+result = chain2.invoke(" Ozone depletion-What does it do??")
 
 print(result)
