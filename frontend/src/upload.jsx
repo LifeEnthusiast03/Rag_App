@@ -1,26 +1,31 @@
 import { useState } from 'react';
 
 export default function PDFUploadTest() {
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile && selectedFile.type === 'application/pdf') {
-      setFile(selectedFile);
-      setError(null);
+    const selectedFiles = Array.from(e.target.files);
+    const pdfFiles = selectedFiles.filter(file => file.type === 'application/pdf');
+    
+    if (pdfFiles.length === 0) {
+      setError('Please select valid PDF files');
+      setFiles([]);
+    } else if (pdfFiles.length !== selectedFiles.length) {
+      setError(`Only ${pdfFiles.length} PDF file(s) selected. Non-PDF files were ignored.`);
+      setFiles(pdfFiles);
     } else {
-      setError('Please select a valid PDF file');
-      setFile(null);
+      setFiles(pdfFiles);
+      setError(null);
     }
   };
 
   const handleUpload = async () => {
-    if (!file) {
-      setError('Please select a file first');
+    if (files.length === 0) {
+      setError('Please select at least one file first');
       return;
     }
 
@@ -28,23 +33,31 @@ export default function PDFUploadTest() {
     setError(null);
     setResponse(null);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const res = await fetch('http://localhost:8000/upload-pdf', {
-        method: 'POST',
-        body: formData,
-      });
+      const results = [];
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || 'Upload failed');
+        const res = await fetch('http://localhost:8000/upload-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(`${file.name}: ${errorData.detail || 'Upload failed'}`);
+        }
+
+        const data = await res.json();
+        results.push(data);
       }
 
-      const data = await res.json();
-      setResponse(data);
-      setFile(null);
+      setResponse({ 
+        message: `Successfully uploaded ${results.length} file(s)`, 
+        files: results 
+      });
+      setFiles([]);
       document.getElementById('fileInput').value = '';
       fetchUploadedFiles();
     } catch (err) {
@@ -111,32 +124,41 @@ export default function PDFUploadTest() {
                 accept=".pdf"
                 onChange={handleFileChange}
                 className="hidden"
+                multiple
               />
               <p className="text-sm text-gray-500 mt-2">or drag and drop</p>
             </div>
           </div>
 
-          {file && (
+          {files.length > 0 && (
             <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700">
-                Selected: <span className="text-indigo-600">{file.name}</span>
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Selected {files.length} file(s):
               </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Size: {formatBytes(file.size)}
+              <div className="space-y-2">
+                {files.map((file, idx) => (
+                  <div key={idx} className="flex justify-between items-center text-xs">
+                    <span className="text-indigo-600 font-medium truncate">{file.name}</span>
+                    <span className="text-gray-500 ml-2">{formatBytes(file.size)}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Total: {formatBytes(files.reduce((acc, f) => acc + f.size, 0))}
               </p>
             </div>
           )}
 
           <button
             onClick={handleUpload}
-            disabled={!file || uploading}
+            disabled={files.length === 0 || uploading}
             className={`w-full py-3 px-4 rounded-lg font-medium text-white transition-colors ${
-              !file || uploading
+              files.length === 0 || uploading
                 ? 'bg-gray-300 cursor-not-allowed'
                 : 'bg-indigo-600 hover:bg-indigo-700'
             }`}
           >
-            {uploading ? 'Uploading...' : 'Upload PDF'}
+            {uploading ? `Uploading ${files.length} file(s)...` : `Upload ${files.length > 0 ? files.length : ''} PDF${files.length !== 1 ? 's' : ''}`}
           </button>
 
           {/* Response Messages */}
@@ -151,11 +173,17 @@ export default function PDFUploadTest() {
               <p className="text-green-800 font-medium mb-2">
                 ✓ {response.message}
               </p>
-              <div className="text-sm text-green-700 space-y-1">
-                <p>Filename: {response.filename}</p>
-                <p>Size: {formatBytes(response.size)}</p>
-                <p className="text-xs text-green-600">Path: {response.path}</p>
-              </div>
+              {response.files && (
+                <div className="text-sm text-green-700 space-y-2 mt-2">
+                  {response.files.map((file, idx) => (
+                    <div key={idx} className="border-t border-green-200 pt-2">
+                      <p className="font-medium">File {idx + 1}: {file.filename}</p>
+                      <p>Size: {formatBytes(file.size)}</p>
+                      <p className="text-xs text-green-600">Path: {file.path}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

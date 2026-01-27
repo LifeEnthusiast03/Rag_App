@@ -1,8 +1,9 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from typing import List
 import shutil
 from pathlib import Path
-
+from rag import load_or_create_vector_store;
 app = FastAPI()
 
 # Enable CORS for your React frontend
@@ -36,7 +37,8 @@ async def upload_pdf(file: UploadFile = File(...)):
     try:
         with file_path.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
+            print("file saved");
+            load_or_create_vector_store();
         return {
             "message": "PDF uploaded successfully",
             "filename": file.filename,
@@ -49,7 +51,6 @@ async def upload_pdf(file: UploadFile = File(...)):
     
     finally:
         file.file.close()
-
 
 @app.get("/uploaded-files")
 def list_uploaded_files():
