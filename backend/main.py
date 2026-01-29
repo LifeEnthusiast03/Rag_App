@@ -4,7 +4,8 @@ from typing import List
 import shutil
 from pathlib import Path
 from datetime import datetime
-from rag import load_or_create_vector_store
+from  fas import load_or_create_vector_store
+from pydantic import BaseModel
 app = FastAPI()
 
 # Enable CORS for your React frontend
@@ -19,6 +20,14 @@ app.add_middleware(
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+class chat_his(BaseModel):
+    role:str
+    content:str
+class ChatRequest(BaseModel):
+    chat_id: str
+    question: str
+    chat_history: List[chat_his]
 
 
 @app.get("/")
@@ -65,12 +74,14 @@ async def upload_pdfs(files: List[UploadFile] = File(...)):
     # Load or create vector store after all files are uploaded
     if uploaded_files:
         try:
+            print("entered here")
             load_or_create_vector_store(batch_dir)
+            print("here fassi index will be generated in future")
         except Exception as e:
             return {
                 "message": f"Files uploaded but vector store update failed: {str(e)}",
                 "files": uploaded_files,
-                "batch_directory": str(batch_dir),
+                "chat_id": timestamp,
                 "errors": errors
             }
     
@@ -80,20 +91,9 @@ async def upload_pdfs(files: List[UploadFile] = File(...)):
     return {
         "message": f"Successfully uploaded {len(uploaded_files)} file(s)",
         "files": uploaded_files,
-        "batch_directory": str(batch_dir),
+        "chat_id": timestamp,
         "errors": errors if errors else None
     }
-
-@app.get("/uploaded-files")
-def list_uploaded_files():
-    files = list(UPLOAD_DIR.glob("*.pdf"))
-    return {
-        "files": [
-            {
-                "name": f.name,
-                "size": f.stat().st_size,
-                "path": str(f)
-            }
-            for f in files
-        ]
-    }
+@app.post("/chat")
+def pdfchat(req: ChatRequest):
+    return {"response": "okay still working"}
