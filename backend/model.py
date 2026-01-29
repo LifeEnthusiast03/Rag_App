@@ -3,7 +3,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from dotenv import load_dotenv
-from rag import get_retriever
+from backend.rag import get_retriever
 
 load_dotenv()
 
