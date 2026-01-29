@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import shutil
 from pathlib import Path
-from rag import load_or_create_vector_store;
+from datetime import datetime
+from rag import load_or_create_vector_store
 app = FastAPI()
 
 # Enable CORS for your React frontend
@@ -24,33 +25,64 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 def read_root():
     return {"message": "PDF Upload API is running"}
 
-
-@app.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
-    # Validate file is a PDF
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+@app.post("/upload-pdfs")
+async def upload_pdfs(files: List[UploadFile] = File(...)):
+    uploaded_files = []
+    errors = []
     
-    # Save the file
-    file_path = UPLOAD_DIR / file.filename
+    # Create a unique directory for this upload batch using timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    batch_dir = UPLOAD_DIR / timestamp
+    batch_dir.mkdir(parents=True, exist_ok=True)
     
-    try:
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            print("file saved");
-            load_or_create_vector_store();
-        return {
-            "message": "PDF uploaded successfully",
-            "filename": file.filename,
-            "size": file_path.stat().st_size,
-            "path": str(file_path)
-        }
+    for file in files:
+        # Validate file is a PDF
+        if not file.filename.endswith('.pdf'):
+            errors.append(f"{file.filename}: Not a PDF file")
+            continue
+        
+        # Save the file in the batch directory
+        file_path = batch_dir / file.filename
+        
+        try:
+            with file_path.open("wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            
+            uploaded_files.append({
+                "filename": file.filename,
+                "size": file_path.stat().st_size,
+                "path": str(file_path),
+                "batch": timestamp
+            })
+            print(f"File saved: {file.filename} in batch {timestamp}")
+        
+        except Exception as e:
+            errors.append(f"{file.filename}: {str(e)}")
+        
+        finally:
+            file.file.close()
     
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
+    # Load or create vector store after all files are uploaded
+    if uploaded_files:
+        try:
+            load_or_create_vector_store(batch_dir)
+        except Exception as e:
+            return {
+                "message": f"Files uploaded but vector store update failed: {str(e)}",
+                "files": uploaded_files,
+                "batch_directory": str(batch_dir),
+                "errors": errors
+            }
     
-    finally:
-        file.file.close()
+    if not uploaded_files and errors:
+        raise HTTPException(status_code=400, detail=f"No files uploaded. Errors: {', '.join(errors)}")
+    
+    return {
+        "message": f"Successfully uploaded {len(uploaded_files)} file(s)",
+        "files": uploaded_files,
+        "batch_directory": str(batch_dir),
+        "errors": errors if errors else None
+    }
 
 @app.get("/uploaded-files")
 def list_uploaded_files():

@@ -34,28 +34,25 @@ export default function PDFUploadTest() {
     setResponse(null);
 
     try {
-      const results = [];
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('files', file);
+      });
 
-        const res = await fetch('http://localhost:8000/upload-pdf', {
-          method: 'POST',
-          body: formData,
-        });
+      const res = await fetch('http://localhost:8000/upload-pdfs', {
+        method: 'POST',
+        body: formData,
+      });
 
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(`${file.name}: ${errorData.detail || 'Upload failed'}`);
-        }
-
-        const data = await res.json();
-        results.push(data);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || 'Upload failed');
       }
 
+      const data = await res.json();
       setResponse({ 
-        message: `Successfully uploaded ${results.length} file(s)`, 
-        files: results 
+        message: data.message, 
+        files: data.files 
       });
       setFiles([]);
       document.getElementById('fileInput').value = '';
