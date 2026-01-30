@@ -4,8 +4,9 @@ from typing import List
 import shutil
 from pathlib import Path
 from datetime import datetime
-from  fas import load_or_create_vector_store
-from pydantic import BaseModel
+from  fas import load_or_create_vector_store,get_vector_store
+from pymodel import ChatRequest
+from chatmodel import get_response
 app = FastAPI()
 
 # Enable CORS for your React frontend
@@ -20,14 +21,6 @@ app.add_middleware(
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
-
-class chat_his(BaseModel):
-    role:str
-    content:str
-class ChatRequest(BaseModel):
-    chat_id: str
-    question: str
-    chat_history: List[chat_his]
 
 
 @app.get("/")
@@ -96,4 +89,5 @@ async def upload_pdfs(files: List[UploadFile] = File(...)):
     }
 @app.post("/chat")
 def pdfchat(req: ChatRequest):
-    return {"response": "okay still working"}
+    response = get_response(req)
+    return {"response": response}

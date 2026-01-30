@@ -28,20 +28,25 @@ def load_or_create_vector_store(filepath:Path):
     split_docs = text_splitter.split_documents(docs)
     uuids = [str(uuid4()) for _ in range(len(split_docs))]
             
-    # Create new vector store for this batch
-    index = faiss.IndexFlatL2(len(embeddings.embed_query("hello world")))
-    vector_store = FAISS(
-        embedding_function=embeddings,
-        index=index,
-        docstore=InMemoryDocstore(),
-        index_to_docstore_id={},
-    )
-    vector_store.add_documents(documents=split_docs, ids=uuids)
+    # Create new vector store for this batch using from_documents
+    vector_store = FAISS.from_documents(documents=split_docs, embedding=embeddings, ids=uuids)
     
     # Save the vector store in the batch's faiss_index directory
     vector_store.save_local(str(persist_path))
     print(f"Vector store saved to {persist_path}")
 
 
-# load_or_create_vector_store()
-    # retriever = vector_store.as_retriever(search_kwargs={"k": 10})
+def get_vector_store(batch_dir:str):
+    # Construct full path with uploads directory
+    batch_path = Path("uploads") / batch_dir
+    persist_path = batch_path / "faiss_index"
+    print(f"Looking for vector store at: {persist_path}")
+    
+    if os.path.exists(persist_path):
+        print("entered here")
+        vector_store = FAISS.load_local(str(persist_path), embeddings, allow_dangerous_deserialization=True)
+    else:
+        load_or_create_vector_store(batch_path)
+        vector_store = FAISS.load_local(str(persist_path), embeddings, allow_dangerous_deserialization=True)
+    print(f"success full geting the vector store")
+    return vector_store
