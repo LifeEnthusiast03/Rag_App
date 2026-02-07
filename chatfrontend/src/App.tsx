@@ -1,18 +1,23 @@
-import { ThemeProvider } from "@/components/theme-provider"
-import LoginPage from "./pages/loginpage"
 
+
+import PDFChatInterface from "./pages/uploadchat"
+import LoginPage from "./pages/loginpage"
+import SignUpPage from "./pages/signuppage"
+import { Routes,Route } from "react-router"
+import { ProtectedRoute } from "./routes/protectedroute"
 function App() {
-  // Set dark theme immediately
-  if (typeof window !== "undefined") {
-    document.documentElement.classList.add("dark")
-  }
+  
 
   return (
-    <ThemeProvider defaultTheme="dark">
-      <div className="min-h-screen bg-background text-foreground">
-        <LoginPage />
-      </div>
-    </ThemeProvider>
+          <Routes>
+            
+            <Route path="/" element={<ProtectedRoute>
+                                      <PDFChatInterface/>
+                                    </ProtectedRoute>}/>
+            <Route path="/login" element={<LoginPage/>}/>
+            <Route path="/signup" element={<SignUpPage/>}/>
+          </Routes>
+          
   )
 }
 
