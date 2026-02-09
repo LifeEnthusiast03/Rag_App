@@ -84,8 +84,15 @@ export default function PDFChatInterface() {
         formData.append('files', file);
       });
 
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch('http://localhost:8000/upload-pdfs', {
         method: 'POST',
+        headers,
         body: formData,
       });
 
@@ -152,20 +159,20 @@ export default function PDFChatInterface() {
     setChatHistory(updatedHistory);
 
     try {
-      // Prepare chat history for API (excluding system messages)
-      const historyForAPI = updatedHistory
-        .filter(msg => msg.role !== 'system')
-        .map(msg => ({ role: msg.role, content: msg.content }));
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
       const res = await fetch('http://localhost:8000/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           chat_id: chatId,
-          question: userMessage,
-          chat_history: historyForAPI
+          question: userMessage
         }),
       });
 
