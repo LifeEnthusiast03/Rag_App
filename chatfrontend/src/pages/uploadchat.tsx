@@ -1,55 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuthContext } from '@/hooks/useauth';
-interface Message {
-  role: string;
-  content: string;
-  timestamp: string;
-}
-
-interface Chat {
-  id: string;
-  title: string;
-  fileName: string;
-  messages: Message[];
-  createdAt: string;
-  updatedAt: string;
-}
+import { useChat } from '@/hooks/usechat';
+import { chatreq } from '@/service/chatservice';
+import type { message } from '@/type/types';
 
 export default function PDFChatInterface() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [chatId, setChatId] = useState<string | null>(null);
-  const [chatHistory, setChatHistory] = useState<Message[]>([]);
+  const [chatHistory, setChatHistory] = useState<message[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [isChatting, setIsChatting] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [savedChats, setSavedChats] = useState<Chat[]>([]);
-  const [currentChatIndex, setCurrentChatIndex] = useState<number | null>(null);
+  const [loadingConversation, setLoadingConversation] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const  {logout} = useAuthContext()
-  // Load saved chats from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem('pdfChats');
-    if (stored) {
-      try {
-        setSavedChats(JSON.parse(stored));
-      } catch (e) {
-        console.error('Failed to load chats:', e);
-      }
-    }
-  }, []);
-
-  // Save chats to localStorage whenever they change
-  useEffect(() => {
-    if (savedChats.length > 0) {
-      localStorage.setItem('pdfChats', JSON.stringify(savedChats));
-    }
-  }, [savedChats]);
+  const { logout, token } = useAuthContext();
+  const {curChatId,setCurChatId,userChats,getChatconversation,setUserChats} = useChat()
 
   useEffect(() => {
-    // Scroll to bottom when new messages arrive
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
 
@@ -58,11 +27,8 @@ export default function PDFChatInterface() {
     const pdfFiles = selectedFiles.filter((file: File) => file.type === 'application/pdf');
     
     if (pdfFiles.length === 0) {
-      setError('Please select valid PDF files');
+      setError('Please select a valid PDF file');
       setFiles([]);
-    } else if (pdfFiles.length !== selectedFiles.length) {
-      setError(`Only ${pdfFiles.length} PDF file(s) selected. Non-PDF files were ignored.`);
-      setFiles(pdfFiles);
     } else {
       setFiles(pdfFiles);
       setError(null);
@@ -71,7 +37,7 @@ export default function PDFChatInterface() {
 
   const handleUpload = async () => {
     if (files.length === 0) {
-      setError('Please select at least one file first');
+      setError('Please select a file first');
       return;
     }
 
@@ -84,7 +50,6 @@ export default function PDFChatInterface() {
         formData.append('files', file);
       });
 
-      const token = localStorage.getItem('token');
       const headers: HeadersInit = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -103,31 +68,17 @@ export default function PDFChatInterface() {
 
       const data = await res.json();
       
-      // Expecting chat_id from backend
       if (data.chat_id) {
-        const newChatHistory = [{
-          role: 'system',
-          content: `PDF "${files[0].name}" uploaded successfully! You can now ask questions about it.`,
-          timestamp: new Date().toISOString()
-        }];
-        
-        setChatId(data.chat_id);
+        setCurChatId(data.chat_id);
         setUploadedFileName(files[0].name);
-        setChatHistory(newChatHistory);
+        setChatHistory([]);
         
-        // Save to chat history
+        // Add new chat to userChats
         const newChat = {
-          id: data.chat_id,
-          title: files[0].name,
-          fileName: files[0].name,
-          messages: newChatHistory,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          chat_id: data.chat_id,
+          chat_name: data.chat_name
         };
-        
-        const updatedChats = [newChat, ...savedChats];
-        setSavedChats(updatedChats);
-        setCurrentChatIndex(0);
+        setUserChats([newChat, ...userChats]);
         
         setFiles([]);
         const fileInput = document.getElementById('fileInput') as HTMLInputElement;
@@ -143,76 +94,37 @@ export default function PDFChatInterface() {
   };
 
   const handleSendMessage = async () => {
-    if (!currentQuestion.trim() || !chatId) return;
-
+    if (!currentQuestion.trim() || !curChatId) return;
     const userMessage = currentQuestion.trim();
     setCurrentQuestion('');
     setIsChatting(true);
-    
-    // Add user message to chat history
-    const newUserMessage = { 
+    const newUserMessage: message = { 
       role: 'user', 
-      content: userMessage,
-      timestamp: new Date().toISOString()
+      content: userMessage
     };
     const updatedHistory = [...chatHistory, newUserMessage];
     setChatHistory(updatedHistory);
 
     try {
-      const token = localStorage.getItem('token');
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const res = await fetch('http://localhost:8000/chat', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          chat_id: chatId,
-          question: userMessage
-        }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || 'Chat request failed');
-      }
-
-      const data = await res.json();
+      const data = await chatreq({
+        chat_id: curChatId,
+        question: userMessage,
+        chat_history: chatHistory
+      }, token);
       
-      // Add assistant response to chat history
-      const assistantMessage = { 
-        role: 'assistant', 
-        content: data.answer || data.response || 'No response received',
-        timestamp: new Date().toISOString()
-      };
-      
-      const finalHistory = [...updatedHistory, assistantMessage];
-      setChatHistory(finalHistory);
-      
-      // Update saved chats
-      if (currentChatIndex !== null) {
-        const updatedChats = [...savedChats];
-        updatedChats[currentChatIndex] = {
-          ...updatedChats[currentChatIndex],
-          messages: finalHistory,
-          updatedAt: new Date().toISOString()
+      if (data.Successful) {
+        const assistantMessage: message = { 
+          role: 'system', 
+          content: data.response
         };
-        setSavedChats(updatedChats);
+        setChatHistory([...updatedHistory, assistantMessage]);
+        setError(null);
+      } else {
+        setError('Failed to get response');
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Chat request failed';
       setError(errorMsg);
-      // Add error message to chat
-      const errorMessage = { 
-        role: 'error', 
-        content: `Error: ${errorMsg}`,
-        timestamp: new Date().toISOString()
-      };
-      setChatHistory(prev => [...prev, errorMessage]);
     } finally {
       setIsChatting(false);
     }
@@ -226,54 +138,28 @@ export default function PDFChatInterface() {
   };
 
   const resetChat = () => {
-    setChatId(null);
+    setCurChatId(0);
     setChatHistory([]);
     setUploadedFileName('');
     setError(null);
-    setCurrentChatIndex(null);
   };
 
-  const loadChat = (index: number) => {
-    const chat = savedChats[index];
-    setChatId(chat.id);
-    setChatHistory(chat.messages);
-    setUploadedFileName(chat.fileName);
-    setCurrentChatIndex(index);
+  const loadChat = async (chat_id: number, chat_name: string) => {
+    if (chat_id === curChatId) return;
+    
+    setLoadingConversation(true);
     setError(null);
-  };
-
-  const deleteChat = (index: number) => {
-    const updatedChats = savedChats.filter((_, i) => i !== index);
-    setSavedChats(updatedChats);
-    
-    if (index === currentChatIndex) {
-      resetChat();
-    } else if (currentChatIndex !== null && index < currentChatIndex) {
-      setCurrentChatIndex(currentChatIndex - 1);
+    try {
+      setCurChatId(chat_id);
+      setUploadedFileName(chat_name);
+      const messages = await getChatconversation(chat_id);
+      setChatHistory(messages);
+    } catch (err) {
+      setError('Failed to load conversation');
+      setChatHistory([]);
+    } finally {
+      setLoadingConversation(false);
     }
-    
-    // Update localStorage
-    if (updatedChats.length === 0) {
-      localStorage.removeItem('pdfChats');
-    }
-  };
-
-  const copyMessage = (content: string) => {
-    navigator.clipboard.writeText(content);
-  };
-
-  const formatTimestamp = (timestamp: string) => {
-    if (!timestamp) return '';
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
-    
-    return date.toLocaleDateString();
   };
 
   const formatBytes = (bytes: number) => {
@@ -309,7 +195,7 @@ export default function PDFChatInterface() {
         
         {/* Chat History List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent">
-          {savedChats.length === 0 ? (
+          {userChats.length === 0 ? (
             <div className="text-center text-gray-500 mt-12 px-4 animate-fade-in">
               <div className="w-16 h-16 bg-gray-800/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,15 +206,15 @@ export default function PDFChatInterface() {
               <p className="text-xs mt-2 text-gray-600">Upload a PDF to start chatting</p>
             </div>
           ) : (
-            savedChats.map((chat, index) => (
+            userChats.map((chat) => (
               <div
-                key={chat.id}
+                key={chat.chat_id}
                 className={`group relative p-3.5 rounded-xl cursor-pointer transition-all duration-200 ${
-                  currentChatIndex === index
+                  curChatId === chat.chat_id
                     ? 'bg-gradient-to-r from-gray-800 to-gray-800/80 border border-gray-700 shadow-lg scale-[1.02]'
                     : 'hover:bg-gray-900/50 hover:scale-[1.01]'
                 }`}
-                onClick={() => loadChat(index)}
+                onClick={() => loadChat(chat.chat_id, chat.chat_name)}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -336,22 +222,9 @@ export default function PDFChatInterface() {
                       <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                       </svg>
-                      <p className="text-sm font-medium truncate">{chat.title}</p>
+                      <p className="text-sm font-medium truncate">{chat.chat_name}</p>
                     </div>
-                    <p className="text-xs text-gray-500">{formatTimestamp(chat.updatedAt)}</p>
-                    <p className="text-xs text-gray-600 mt-1">{chat.messages.length} messages</p>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteChat(index);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-900/40 rounded-lg transition-all hover:scale-110 active:scale-95"
-                  >
-                    <svg className="w-4 h-4 text-red-400 hover:text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
                 </div>
               </div>
             ))
@@ -365,10 +238,11 @@ export default function PDFChatInterface() {
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               <span>Connected</span>
             </div>
-            <p className="font-medium">{savedChats.length} conversation{savedChats.length !== 1 ? 's' : ''}</p>
+            <p className="font-medium">{userChats.length} conversation{userChats.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
       </div>
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden relative z-10">
         {/* Top Bar */}
@@ -382,7 +256,7 @@ export default function PDFChatInterface() {
             </svg>
           </button>
           
-          {chatId && (
+          {curChatId !== 0 && (
             <div className="flex-1 flex items-center gap-3 animate-fade-in">
               <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 shadow-lg">
                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -390,10 +264,12 @@ export default function PDFChatInterface() {
                 </svg>
                 <span className="text-sm font-medium truncate max-w-md">{uploadedFileName}</span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-900/50 px-3 py-1.5 rounded-lg border border-gray-800/50">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                <span>ID: {chatId}</span>
-              </div>
+              <button
+                onClick={resetChat}
+                className="px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-xl transition-all flex items-center gap-2 border border-gray-700/50 hover:scale-105 active:scale-95"
+              >
+                <span className="text-sm font-medium">New Chat</span>
+              </button>
             </div>
           )}
           
@@ -410,7 +286,7 @@ export default function PDFChatInterface() {
         </div>
         {/* Content Area */}
         <div className="flex-1 overflow-hidden">
-          {!chatId ? (
+          {curChatId === 0 ? (
             // Upload Interface
             <div className="h-full flex items-center justify-center p-8 animate-fade-in">
               <div className="max-w-2xl w-full">
@@ -529,7 +405,17 @@ export default function PDFChatInterface() {
               {/* Messages Container */}
               <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent">
                 <div className="max-w-4xl mx-auto space-y-6">
-                  {chatHistory.length === 0 && (
+                  {loadingConversation ? (
+                    <div className="text-center mt-20 animate-fade-in">
+                      <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-800/50 backdrop-blur-sm rounded-3xl mb-6 shadow-xl">
+                        <svg className="animate-spin h-10 w-10 text-gray-600" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      </div>
+                      <h3 className="text-2xl font-semibold mb-2">Loading conversation...</h3>
+                    </div>
+                  ) : chatHistory.length === 0 ? (
                     <div className="text-center mt-20 animate-fade-in">
                       <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-800/50 backdrop-blur-sm rounded-3xl mb-6 shadow-xl">
                         <svg className="w-10 h-10 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -539,73 +425,34 @@ export default function PDFChatInterface() {
                       <h3 className="text-2xl font-semibold mb-2">Start a Conversation</h3>
                       <p className="text-gray-400 text-lg">Ask me anything about your PDF</p>
                     </div>
-                  )}
+                  ) : null}
 
-                  {chatHistory.map((message, idx) => (
+                  {!loadingConversation && chatHistory.map((message, idx) => (
                     <div
                       key={idx}
                       className={`flex gap-4 animate-slide-up ${
                         message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                      } ${message.role === 'system' ? 'justify-center' : ''}`}
+                      }`}
                     >
-                      {message.role !== 'system' && (
-                        <div className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg ${
-                          message.role === 'user'
-                            ? 'bg-gradient-to-br from-gray-700 to-gray-600 ring-2 ring-gray-600/20'
-                            : message.role === 'assistant'
-                            ? 'bg-gray-800 border border-gray-700 ring-2 ring-gray-700/20'
-                            : 'bg-red-900/30 border border-red-700'
-                        }`}>
-                          {message.role === 'user' ? (
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                          ) : message.role === 'assistant' ? (
-                            <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                            </svg>
-                          ) : (
-                            <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          )}
-                        </div>
-                      )}
+                      <div className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg ${
+                        message.role === 'user'
+                          ? 'bg-gradient-to-br from-gray-700 to-gray-600 ring-2 ring-gray-600/20'
+                          : 'bg-gray-800 border border-gray-700 ring-2 ring-gray-700/20'
+                      }`}>
+                        {message.role === 'user' ? (
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                          </svg>
+                        )}
+                      </div>
 
-                      <div className={`flex-1 ${message.role === 'system' ? 'max-w-md' : 'max-w-3xl'}`}>
-                        <div className={`group relative transition-all duration-300 hover:scale-[1.01] ${
-                          message.role === 'system'
-                            ? 'bg-green-900/20 backdrop-blur-sm border border-green-800/50 rounded-2xl p-5 text-center shadow-lg'
-                            : message.role === 'error'
-                            ? 'bg-red-900/20 backdrop-blur-sm border border-red-800/50 rounded-2xl p-5 shadow-lg'
-                            : 'bg-gray-800/40 backdrop-blur-sm rounded-3xl p-6 border border-gray-700/50 shadow-xl'
-                        }`}>
-                          <div className={`prose prose-invert max-w-none ${
-                            message.role === 'system' ? 'text-green-300 text-sm' :
-                            message.role === 'error' ? 'text-red-300' :
-                            'text-gray-100'
-                          }`}>
-                            <p className="whitespace-pre-wrap leading-relaxed m-0">{message.content}</p>
-                          </div>
-                          
-                          {message.role === 'assistant' && (
-                            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700/50">
-                              <button
-                                onClick={() => copyMessage(message.content)}
-                                className="p-2.5 hover:bg-gray-700/50 rounded-xl transition-all duration-200 flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 hover:scale-105 active:scale-95"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                                Copy
-                              </button>
-                              {message.timestamp && (
-                                <span className="text-xs text-gray-500 ml-auto">
-                                  {formatTimestamp(message.timestamp)}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                      <div className="flex-1 max-w-3xl">
+                        <div className="bg-gray-800/40 backdrop-blur-sm rounded-3xl p-6 border border-gray-700/50 shadow-xl">
+                          <p className="text-gray-100 whitespace-pre-wrap leading-relaxed">{message.content}</p>
                         </div>
                       </div>
                     </div>

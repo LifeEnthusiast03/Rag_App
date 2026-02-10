@@ -57,4 +57,46 @@ interface AuthContextType {
 interface AuthProviderProps{
     children:ReactNode
 }
-export type {loginForm,signupForm,loggedUser,registereduser,ApiResponse,LoginResponse,SignupResponse,callResponse,AuthContextType,AuthProviderProps}
+interface chat{
+    chat_id:number
+    chat_name:string
+}
+interface getAllChatResponse{
+    chats :chat[]
+    Successful:boolean
+}
+interface message{
+    role:string
+    content:string
+}
+interface conversationResponse{
+    messages:message[]
+    Successful:boolean
+}
+
+interface chatRequestFormat{
+       chat_id :number
+       question:string
+       chat_history:message[]
+
+}
+interface chatResponseFormat{
+        response:string
+        Successful:boolean
+}
+export type {loginForm,
+            signupForm,
+            loggedUser,
+            registereduser,
+            ApiResponse,
+            LoginResponse,
+            SignupResponse,
+            callResponse,
+            AuthContextType,
+            AuthProviderProps,
+            chat,
+            getAllChatResponse,
+            message,
+            conversationResponse,
+            chatRequestFormat,
+            chatResponseFormat}
