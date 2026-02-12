@@ -16,7 +16,7 @@ export default function PDFChatInterface() {
   const [loadingConversation, setLoadingConversation] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { logout, token } = useAuthContext();
-  const {curChatId,setCurChatId,userChats,getChatconversation,setUserChats} = useChat()
+  const {curChatId,setCurChatId,userChats,getChatconversation,setUserChats,deleteChat} = useChat()
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -162,6 +162,26 @@ export default function PDFChatInterface() {
     }
   };
 
+  const handleDeleteChat = async (e: React.MouseEvent, chat_id: number) => {
+    e.stopPropagation(); // Prevent triggering loadChat
+    
+    if (!confirm('Are you sure you want to delete this chat?')) return;
+    
+    try {
+      const result = await deleteChat(chat_id);
+      if (result.Successful) {
+        // If deleted chat was the current one, reset the view
+        if (curChatId === chat_id) {
+          resetChat();
+        }
+      } else {
+        setError(result.message || 'Failed to delete chat');
+      }
+    } catch (err) {
+      setError('Failed to delete chat');
+    }
+  };
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -225,6 +245,15 @@ export default function PDFChatInterface() {
                       <p className="text-sm font-medium truncate">{chat.chat_name}</p>
                     </div>
                   </div>
+                  <button
+                    onClick={(e) => handleDeleteChat(e, chat.chat_id)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-900/50 rounded-lg transition-all flex-shrink-0 hover:scale-110 active:scale-95"
+                    title="Delete chat"
+                  >
+                    <svg className="w-4 h-4 text-gray-400 hover:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             ))

@@ -84,6 +84,10 @@ interface chatResponseFormat{
         response:string
         Successful:boolean
 }
+interface deletechatResponse{
+            Successful:boolean
+            message:string
+}
 export type {loginForm,
             signupForm,
             loggedUser,
@@ -99,4 +103,5 @@ export type {loginForm,
             message,
             conversationResponse,
             chatRequestFormat,
-            chatResponseFormat}
+            chatResponseFormat,
+            deletechatResponse}

@@ -1,5 +1,5 @@
 
-import type { getAllChatResponse,conversationResponse,chatRequestFormat,chatResponseFormat } from "@/type/types";
+import type { getAllChatResponse,conversationResponse,chatRequestFormat,chatResponseFormat,deletechatResponse } from "@/type/types";
 const getAllChats = async(token:string):Promise<getAllChatResponse>=>{
     try{
         const authHeader = "Bearer "+token
@@ -67,4 +67,26 @@ const chatreq = async(req:chatRequestFormat,token:string):Promise<chatResponseFo
                 throw e
         }
 }
-export {getAllChats,getChatConversation,chatreq}
+
+const deletechat = async(token:string,chatid:number):Promise<deletechatResponse>=>{
+        try{
+                const authHeader = "Bearer "+token
+                const response = await fetch(`http://localhost:8000/deletechat?chatid=${chatid}`,{
+                    method:"DELETE",
+                    headers:{
+                        "content-type":"application/json",
+                        "Authorization":authHeader
+                    }
+                });
+            if(!(response.ok)){
+                    throw new Error("failed to delete conversation")
+            }
+            const data =await response.json();
+                return data
+        }
+        catch(e){
+                console.error("failed to delete chat")
+                throw e
+        }
+}
+export {getAllChats,getChatConversation,chatreq,deletechat}
