@@ -9,12 +9,13 @@ This is a production-ready frontend application built with React 19, TypeScript,
 - 💬 Chat with PDFs using AI (RAG-powered responses)
 - 🔐 Secure authentication with JWT tokens
 - 📚 Manage multiple conversations
+- �️ Delete conversations with confirmation
 - 💾 Persistent chat history
 - 🎨 Modern, responsive dark UI
 
 **Tech Stack**: React 19 • TypeScript 5.9 • Vite 7.2 • Tailwind CSS 4.1 • React Router 7.13
 
-**Status**: ✅ Core features complete | 🚀 Active development
+**Status**: ✅ Core features complete | 🚀 Active development | ✨ Recently added: Conversation deletion
 
 ## � Table of Contents
 
@@ -59,8 +60,10 @@ This is a production-ready frontend application built with React 19, TypeScript,
 - **Multi-conversation Support**: Manage and switch between multiple PDF chat sessions
 - **Conversation Sidebar**: Collapsible sidebar displaying all user chat sessions
 - **Load Previous Chats**: Retrieve and continue past conversations
+- **Delete Conversations**: Remove unwanted chats with confirmation dialog
 - **Real-time Messaging**: Instant AI responses with loading indicators
 - **Message Display**: Clean message interface with role-based styling (user/assistant)
+- **Smart State Management**: Automatic UI updates when deleting active conversations
 
 ### User Interface & Experience
 - **Modern Dark Theme**: Sleek, gradient-based dark UI with backdrop blur effects
@@ -68,10 +71,12 @@ This is a production-ready frontend application built with React 19, TypeScript,
 - **Collapsible Sidebar**: Toggleable conversation history sidebar
 - **Theme Support**: Theme provider infrastructure for light/dark modes
 - **Smooth Animations**: Polished transitions and hover effects
+- **Hover Actions**: Context-sensitive delete buttons appearing on hover
 - **Auto-scroll**: Automatic scroll to latest messages
 - **Loading States**: Visual feedback for uploads, chat responses, and data loading
 - **Error Handling**: User-friendly error messages and validation
 - **Keyboard Shortcuts**: Enter to send messages, easy navigation
+- **Confirmation Dialogs**: Safety prompts for destructive actions
 
 ### State Management Architecture
 - **AuthContext**: Centralized authentication state (user, token, login/logout)
@@ -305,6 +310,7 @@ The application integrates with a FastAPI backend at `http://localhost:8000` wit
 - **POST /chat** - Send messages and receive AI-generated responses
 - **GET /getchat** - Retrieve all user's chat sessions
 - **GET /getchatconversation?chatid={id}** - Get full conversation history for specific chat
+- **DELETE /deletechat?chatid={id}** - Delete a chat conversation permanently
 
 ### Expected API Response Formats
 
@@ -386,6 +392,14 @@ The application integrates with a FastAPI backend at `http://localhost:8000` wit
 }
 ```
 
+**Delete Chat Response:**
+```typescript
+{
+  Successful: boolean,
+  message: string
+}
+```
+
 ### API Authentication
 
 All protected endpoints require JWT token in Authorization header:
@@ -447,6 +461,23 @@ Sidebar Chat Click → getChatConversation() → Backend DB
                 Display full conversation
 ```
 
+**Delete Conversation:**
+```
+Delete Button Click → Confirmation Dialog
+                            ↓
+                      User confirms
+                            ↓
+              deleteChat() → Backend API
+                            ↓
+                    Database deletion
+                            ↓
+            ChatContext state updated
+                            ↓
+      UI refreshed (chat removed from sidebar)
+                            ↓
+    If active chat deleted → reset to empty state
+```
+
 ### Type Safety
 
 All API requests and responses are fully typed with TypeScript interfaces defined in [src/type/types.ts](chatfrontend/src/type/types.ts):
@@ -457,6 +488,7 @@ All API requests and responses are fully typed with TypeScript interfaces define
 - `chat`, `message` - Chat entities
 - `chatRequestFormat`, `chatResponseFormat` - Chat API
 - `getAllChatResponse`, `conversationResponse` - Conversation API
+- `deletechatResponse` - Delete conversation response
 - `AuthContextType`, `chatcontextType` - Context types
 
 ## 🎨 Customization
@@ -593,8 +625,11 @@ import { Button } from "@/components/ui/button"
 - View all user's chat sessions in collapsible sidebar
 - Switch between different chat conversations
 - Load previous conversation history
+- Delete conversations with confirmation dialog
+- Automatic UI refresh after deletion
 - Display chat names for easy identification
 - Real-time sidebar updates when new chats are created
+- Hover-activated delete buttons for each chat
 
 **User Interface Elements**
 - Collapsible sidebar (toggle open/close)
@@ -642,6 +677,8 @@ import { Button } from "@/components/ui/button"
 - User's chat list management
 - Fetch all chats on login
 - Load specific conversation history
+- Delete conversations with automatic state updates
+- Reset active chat when deleted
 - Conversation loading states
 
 ## 🔧 Troubleshooting
@@ -668,6 +705,13 @@ import { Button } from "@/components/ui/button"
 - Verify backend upload endpoint is working
 - Check file size limits on backend
 - Look for errors in browser console
+
+**Delete Chat Not Working**
+- Ensure backend has DELETE endpoint configured
+- Check if confirmation dialog is appearing
+- Verify token authorization in DELETE request
+- Check browser console for error messages
+- Confirm chat is removed from database on backend
 
 **UI Issues / Styling Problems**
 - Clear browser cache
@@ -779,15 +823,18 @@ This project is licensed under the terms specified in the LICENSE file.
 - AI-powered chat with RAG integration
 - Multiple conversation management
 - Conversation history loading
+- **Delete conversations** with confirmation dialog
+- Automatic state updates after deletion
 - Persistent authentication state
 - Protected routing
 - Responsive UI with modern design
+- Hover-based context actions
 - Error handling and loading states
 
 ### 🔄 Potential Improvements
 - **File Validation**: Add file size limits and more robust validation
-- **Message Features**: Copy to clipboard, message timestamps
-- **Conversation Management**: Delete conversations, rename chats
+- **Message Features**: Copy to clipboard, message timestamps, edit messages
+- **Conversation Management**: Rename chats, archive conversations, conversation search
 - **Export Functionality**: Export chat history as PDF/TXT
 - **Search**: Search through conversations and messages
 - **Real-time Updates**: WebSocket support for live updates
@@ -796,10 +843,12 @@ This project is licensed under the terms specified in the LICENSE file.
 - **Performance**: Implement virtual scrolling for long conversations
 - **Rate Limiting**: Frontend throttling for API requests
 - **Rich Text**: Support for formatted responses (markdown, code blocks)
-- **File Management**: View uploaded PDFs, multiple PDFs per chat
-- **User Profile**: Profile page, settings, password change
+- **File Management**: View uploaded PDFs, multiple PDFs per chat, PDF preview
+- **User Profile**: Profile page, settings, password change, avatar upload
 - **Theme Customization**: Complete light mode implementation
 - **Analytics**: Track usage patterns and user interactions
+- **Undo/Redo**: Undo delete operations with toast notifications
+- **Bulk Operations**: Select and delete multiple conversations
 
 ## � Project Status
 
@@ -808,8 +857,15 @@ This project is licensed under the terms specified in the LICENSE file.
 **Status**: ✅ Core features implemented and functional
 - Authentication system complete
 - PDF upload and chat working
-- Conversation management operational
+- Conversation management operational (including deletion)
 - UI responsive and polished
+- Error handling and user feedback implemented
+
+**Recent Updates** (February 2026):
+- ✅ Implemented delete chat functionality with confirmation
+- ✅ Added automatic state synchronization on deletion
+- ✅ Fixed error messages in chat service
+- ✅ Enhanced user experience with hover-based actions
 
 **Active Development**: Yes
 - Bug fixes and improvements ongoing
