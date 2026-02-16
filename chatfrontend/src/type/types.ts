@@ -69,6 +69,17 @@ interface message{
     role:string
     content:string
 }
+
+interface structuredChatResponse{
+    answer: string
+    key_points: string[]
+    confidence_level: string
+    sources_cited: string[]
+    needs_clarification: boolean
+    clarification_needed: string | null
+    follow_up_suggestions: string[]
+}
+
 interface conversationResponse{
     messages:message[]
     Successful:boolean
@@ -81,8 +92,13 @@ interface chatRequestFormat{
 
 }
 interface chatResponseFormat{
-        response:string
-        Successful:boolean
+        success: boolean
+        chat_id: number
+        response: string  // JSON stringified structured response
+        role: string
+        timestamp: string
+        sources_used: number
+        error_message: string | null
 }
 interface deletechatResponse{
             Successful:boolean
@@ -101,6 +117,7 @@ export type {loginForm,
             chat,
             getAllChatResponse,
             message,
+            structuredChatResponse,
             conversationResponse,
             chatRequestFormat,
             chatResponseFormat,
