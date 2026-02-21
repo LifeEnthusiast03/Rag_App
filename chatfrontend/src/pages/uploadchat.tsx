@@ -3,6 +3,7 @@ import { useAuthContext } from '@/hooks/useauth';
 import { useChat } from '@/hooks/usechat';
 import { chatreq } from '@/service/chatservice';
 import type { message, structuredChatResponse } from '@/type/types';
+import ProfileDropdown from '@/components/profile-dropdown';
 
 export default function PDFChatInterface() {
   const [files, setFiles] = useState<File[]>([]);
@@ -15,7 +16,7 @@ export default function PDFChatInterface() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const { logout, token } = useAuthContext();
+  const { token } = useAuthContext();
   const {curChatId,setCurChatId,userChats,getChatconversation,setUserChats,deleteChat} = useChat()
 
   // Helper function to check if response is structured
@@ -313,16 +314,10 @@ export default function PDFChatInterface() {
             </div>
           )}
           
-          {/* Logout Button */}
-          <button
-            onClick={logout}
-            className="ml-auto px-4 py-2 bg-gray-800/50 hover:bg-red-900/50 rounded-xl transition-all flex items-center gap-2 border border-gray-700/50 hover:border-red-700/50 group hover:scale-105 active:scale-95 shadow-lg"
-          >
-            <svg className="w-5 h-5 group-hover:text-red-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            <span className="text-sm font-medium">Logout</span>
-          </button>
+          {/* Profile Dropdown */}
+          <div className="ml-auto">
+            <ProfileDropdown />
+          </div>
         </div>
         {/* Content Area */}
         <div className="flex-1 overflow-hidden">
