@@ -58,7 +58,7 @@ export default function SignUpPage() {
             </svg>
           </div>
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
-            PDF Chat
+            Readwise
           </h1>
           <p className="text-gray-400">
             Create your account

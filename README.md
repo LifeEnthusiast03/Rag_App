@@ -1,24 +1,26 @@
-# RAG Chat Application - Full Stack
+# Readwise - Full Stack
 
-> A modern full-stack RAG (Retrieval-Augmented Generation) application for intelligent conversations with PDF documents. Built with React 19, TypeScript, FastAPI, PostgreSQL, and FAISS vector search. Upload PDFs and have AI-powered conversations grounded in your document content with complete authentication and conversation management.
+> A modern full-stack RAG (Retrieval-Augmented Generation) application for intelligent conversations with PDF documents. Built with React 19, TypeScript, FastAPI, PostgreSQL, and FAISS vector search. Upload PDFs and have AI-powered conversations grounded in your document content with complete authentication (email/password + GitHub OAuth) and conversation management.
 
 ## 🎯 Quick Overview
 
-This is a production-ready full-stack RAG (Retrieval-Augmented Generation) chat application that enables users to have intelligent conversations with their PDF documents. The frontend is built with React 19, TypeScript, and Tailwind CSS, integrated with a FastAPI backend using PostgreSQL and FAISS vector search.
+This is a production-ready full-stack RAG (Retrieval-Augmented Generation) application that enables users to have intelligent conversations with their PDF documents. The frontend is built with React 19, TypeScript, and Tailwind CSS, integrated with a FastAPI backend using PostgreSQL and FAISS vector search.
 
 **Key Capabilities**:
-- 📄 Upload PDF documents with automatic processing
-- 💬 Chat with PDFs using AI-powered RAG responses
-- 🔐 Secure authentication with JWT tokens
+- 📄 Upload multiple PDF documents with automatic processing
+- 💬 Intelligent conversations with PDFs using AI-powered RAG responses
+- 🔐 Secure authentication with JWT tokens (Email/Password + GitHub OAuth)
+- 👤 Profile dropdown with user information display
 - 📚 Manage multiple conversations seamlessly
 - 🗑️ Delete conversations with confirmation dialogs
 - 💾 Persistent chat history in PostgreSQL database
 - 🎨 Modern, responsive dark UI with smooth interactions
 - 🔍 FAISS vector similarity search for accurate context retrieval
+- 🌓 Theme toggle infrastructure for dark/light modes
 
 **Tech Stack**: React 19 • TypeScript 5.9 • Vite 7.2 • Tailwind CSS 4.1 • React Router 7.13 • FastAPI • PostgreSQL • FAISS
 
-**Status**: ✅ Core features complete | 🚀 Active development | ✨ Production-ready frontend
+**Status**: ✅ All core features complete | 🚀 Active development | ✨ Production-ready frontend
 
 ## � Table of Contents
 
@@ -41,14 +43,17 @@ This is a production-ready full-stack RAG (Retrieval-Augmented Generation) chat 
 - [Project Status](#-project-status)
 - [Support & Contact](#-support--contact)
 
-## �🚀 Features
+## 🚀 Features
 
 ### Authentication System
-- **User Registration & Login**: Secure JWT-based authentication
+- **Email/Password Authentication**: Secure JWT-based authentication with user registration and login
+- **GitHub OAuth Integration**: One-click sign-in with GitHub account via OAuth flow
+- **OAuth Callback Handler**: Dedicated callback page for seamless GitHub authentication
 - **Protected Routes**: Route guards preventing unauthorized access to chat features
 - **Persistent Sessions**: Automatic login restoration using localStorage
 - **Dual Context Architecture**: Separate AuthContext and ChatContext for clean state management
 - **Secure Logout**: Complete session cleanup on logout
+- **Profile Dropdown**: User profile display with avatar initials, username, and email
 
 ### PDF Document Management
 - **PDF Upload**: Upload PDF files with validation
@@ -71,8 +76,9 @@ This is a production-ready full-stack RAG (Retrieval-Augmented Generation) chat 
 ### User Interface & Experience
 - **Modern Dark Theme**: Sleek, gradient-based dark UI with backdrop blur effects
 - **Responsive Design**: Mobile-first design working seamlessly across all devices
+- **Profile Dropdown**: Interactive dropdown menu displaying user avatar (initials), username, and email
 - **Collapsible Sidebar**: Toggleable conversation history sidebar
-- **Theme Support**: Theme provider infrastructure for light/dark modes
+- **Theme Toggle**: Theme switcher component with sun/moon icons (infrastructure ready)
 - **Smooth Animations**: Polished transitions and hover effects
 - **Hover Actions**: Context-sensitive delete buttons appearing on hover
 - **Auto-scroll**: Automatic scroll to latest messages
@@ -80,6 +86,7 @@ This is a production-ready full-stack RAG (Retrieval-Augmented Generation) chat 
 - **Error Handling**: User-friendly error messages and validation
 - **Keyboard Shortcuts**: Enter to send messages, easy navigation
 - **Confirmation Dialogs**: Safety prompts for destructive actions
+- **Avatar System**: Automatic initial-based avatars with gradient backgrounds
 
 ### State Management Architecture
 - **AuthContext**: Centralized authentication state (user, token, login/logout)
@@ -141,6 +148,7 @@ e:\rag/
 │   │   │   │   ├── field.tsx
 │   │   │   │   └── separator.tsx
 │   │   │   ├── login-form.tsx
+│   │   │   ├── profile-dropdown.tsx  # User profile dropdown menu
 │   │   │   ├── theme-provider.tsx
 │   │   │   └── theme-toggle.tsx
 │   │   ├── context/             # React Context providers
@@ -150,8 +158,9 @@ e:\rag/
 │   │   │   ├── useauth.ts       # Hook to access AuthContext
 │   │   │   └── usechat.ts       # Hook to access ChatContext
 │   │   ├── pages/               # Page components
-│   │   │   ├── loginpage.tsx    # Login page
+│   │   │   ├── loginpage.tsx    # Login page with email/password + GitHub
 │   │   │   ├── signuppage.tsx   # User registration page
+│   │   │   ├── githubcallback.tsx  # GitHub OAuth callback handler
 │   │   │   └── uploadchat.tsx   # Main chat interface
 │   │   ├── routes/              # Route configuration
 │   │   │   └── protectedroute.tsx  # Route guard for authentication
@@ -213,10 +222,17 @@ e:\rag/
 
 2. **Configure backend environment**
    ```bash
-   # Create .env file with database credentials
+   # Create .env file with database credentials and OAuth settings
    DATABASE_URL=postgresql://user:password@localhost:5432/rag_chat_db
    SECRET_KEY=your-secret-key-for-jwt
+   GITHUB_CLIENT_ID=your-github-oauth-app-client-id
+   GITHUB_CLIENT_SECRET=your-github-oauth-app-client-secret
    ```
+   
+   **GitHub OAuth Setup**: 
+   - Create a GitHub OAuth App in GitHub Settings → Developer settings → OAuth Apps
+   - Set Authorization callback URL to: `http://localhost:8000/auth/github/callback`
+   - Copy Client ID and Client Secret to your .env file
 
 3. **Start backend server**
    ```bash
@@ -313,7 +329,7 @@ To change the API URL, update the fetch calls in:
    - Register with username, email, and password
    - Login with your credentials
 
-5. **Start chatting with PDFs!**
+5. **Start conversing with your PDFs!**
    - Upload a PDF document
    - Wait for processing to complete
    - Ask questions about the document content
@@ -392,6 +408,8 @@ The application integrates with a FastAPI backend at `http://localhost:8000` wit
 ### Authentication Endpoints
 - **POST /login** - User authentication with email and password
 - **POST /signup** - User registration with username, email, and password
+- **GET /githublogin** - Initiates GitHub OAuth flow (redirects to GitHub)
+- **GET /auth/github/callback** - GitHub OAuth callback handler (returns token and user data as query params)
 
 ### Chat & Document Endpoints
 - **POST /upload-pdfs** - Upload PDF files and create new chat session
@@ -510,9 +528,28 @@ Authorization: Bearer <token>
 </StrictMode>
 ```
 
+### Application Routes
+
+The application defines the following routes in [App.tsx](chatfrontend/src/App.tsx):
+
+```tsx
+<Routes>
+  <Route path="/" element={<ProtectedRoute><PDFChatInterface/></ProtectedRoute>} />
+  <Route path="/login" element={<LoginPage/>} />
+  <Route path="/signup" element={<SignUpPage/>} />
+  <Route path="/auth/github/callback" element={<GitHubCallback/>} />
+</Routes>
+```
+
+**Route Details**:
+- **`/`** - Main chat interface (protected route, requires authentication)
+- **`/login`** - Login page with email/password and GitHub OAuth
+- **`/signup`** - User registration page with email/password and GitHub OAuth
+- **`/auth/github/callback`** - GitHub OAuth callback handler
+
 ### Data Flow
 
-**Authentication Flow:**
+**Email/Password Authentication Flow:**
 ```
 LoginPage → login() → authservice.ts → Backend API
                 ↓
@@ -521,6 +558,29 @@ LoginPage → login() → authservice.ts → Backend API
          localStorage (persistence)
                 ↓
          ProtectedRoute → PDFChatInterface
+```
+
+**GitHub OAuth Authentication Flow:**
+```
+LoginPage → Click "Continue with GitHub" → /githublogin endpoint
+                                              ↓
+                                    GitHub OAuth page
+                                              ↓
+                              User grants permission
+                                              ↓
+                        Backend /auth/github/callback
+                                              ↓
+                   Redirect to frontend callback with token
+                                              ↓
+                        GitHubCallback component
+                                              ↓
+                        Extract token from URL
+                                              ↓
+                    Update AuthContext & localStorage
+                                              ↓
+                         Navigate to /
+                                              ↓
+                          PDFChatInterface
 ```
 
 **Chat Flow:**
@@ -643,6 +703,8 @@ import { Button } from "@/components/ui/button"
 
 ## 🔐 Authentication Flow
 
+### Email/Password Authentication
+
 1. **Registration**: User signs up with username, email, and password
    - Data sent to `/signup` endpoint
    - Returns user information (without token)
@@ -654,6 +716,26 @@ import { Button } from "@/components/ui/button"
    - Token and user data stored in localStorage
    - AuthContext updated with user state
    - User redirected to main chat interface
+
+### GitHub OAuth Authentication
+
+1. **OAuth Initiation**: User clicks "Continue with GitHub" button
+   - Redirects to backend endpoint `/githublogin`
+   - Backend redirects to GitHub OAuth authorization page
+   - User grants access on GitHub
+
+2. **OAuth Callback**: GitHub redirects back to application
+   - Callback handled at `/auth/github/callback` route
+   - GitHubCallback component extracts token and user data from URL parameters
+   - Token, user_id, user_name, and email received as query parameters
+   - Data stored in AuthContext and localStorage
+   - User automatically redirected to chat interface
+
+3. **Error Handling**: If OAuth fails
+   - Error message displayed on callback page  
+   - User can retry or return to login page
+
+### Shared Authentication Features
 
 3. **Session Persistence**: On app reload
    - App checks localStorage for existing token
@@ -750,6 +832,7 @@ Answer generated → Saved to database → Displayed in UI
 
 **Login Page (loginpage.tsx)**
 - Email and password input fields
+- **GitHub OAuth button** - one-click sign-in with GitHub
 - Form validation and error display
 - Secure JWT token-based authentication
 - Redirect to main chat on successful login
@@ -757,9 +840,36 @@ Answer generated → Saved to database → Displayed in UI
 
 **Signup Page (signuppage.tsx)**
 - Username, email, and password registration
+- **GitHub OAuth button** - one-click sign-up with GitHub
 - Form validation
 - Success/error message display
 - Redirect to login after successful registration
+
+**GitHub Callback Page (githubcallback.tsx)**
+- Handles OAuth callback from GitHub
+- Extracts authentication data from URL query parameters (token, user_id, user_name, email)
+- Stores user data in AuthContext and localStorage
+- Displays loading state during processing
+- Shows error messages if authentication fails
+- Automatically redirects to chat interface on success
+
+### User Interface Components
+
+**Profile Dropdown (profile-dropdown.tsx)**
+- Displays user avatar with initials
+- Shows username and email
+- Expandable dropdown menu on click
+- User information section with icons
+- Logout button
+- Closes on outside click
+- Animated transitions
+- Responsive design (hides username on mobile)
+
+**Theme Toggle (theme-toggle.tsx)**
+- Sun/moon icon toggle button
+- Integrates with theme provider
+- Switches between light and dark themes
+- Accessible with aria-label
 
 ### Route Protection
 
@@ -815,6 +925,15 @@ Answer generated → Saved to database → Displayed in UI
 - Token may have expired - try logging in again
 - Clear localStorage and login fresh if issues persist
 - Verify backend JWT secret key is consistent
+
+**GitHub OAuth Not Working**
+- Verify GitHub OAuth App is created in GitHub Settings → Developer settings
+- Check GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in backend .env file
+- Ensure callback URL is set correctly in GitHub OAuth App: `http://localhost:8000/auth/github/callback`
+- Check browser console for error messages during OAuth flow
+- Verify backend /githublogin endpoint is accessible
+- Check network tab for failed redirects
+- Clear cookies and try again if stuck on callback page
 
 **Chat History Not Loading**
 - Check network tab for failed API requests
@@ -973,7 +1092,9 @@ This project is licensed under the terms specified in the LICENSE file.
 ## 🐛 Current State & Future Enhancements
 
 ### ✅ Implemented Features
-- Complete authentication system (login/signup/logout)
+- **Complete authentication system** (email/password + GitHub OAuth)
+- **GitHub OAuth Integration**: One-click sign-in with GitHub account
+- **Profile Dropdown**: User profile display with avatar, username, and email
 - JWT token-based session management
 - PDF upload and processing
 - AI-powered chat with RAG integration
@@ -986,6 +1107,7 @@ This project is licensed under the terms specified in the LICENSE file.
 - Responsive UI with modern design
 - Hover-based context actions
 - Error handling and loading states
+- **Theme toggle component** (infrastructure ready)
 
 ### 🔄 Planned Enhancements
 
@@ -1018,14 +1140,18 @@ This project is licensed under the terms specified in the LICENSE file.
 **Current Version**: 0.0.0 (Active Development - February 2026)
 
 **Status**: ✅ Core features implemented and fully functional
-- ✅ Authentication system complete with JWT tokens
+- ✅ Authentication system complete with JWT tokens (Email/Password + GitHub OAuth)
+- ✅ GitHub OAuth integration with callback handler
+- ✅ Profile dropdown with user information display
 - ✅ PDF upload and RAG-powered chat working
+- ✅ Multiple PDF support per user
 - ✅ Conversation management operational (create, load, delete)
 - ✅ UI responsive and polished with modern design
 - ✅ Error handling and user feedback implemented
 - ✅ PostgreSQL database configured and operational
 - ✅ FAISS vector indexing for document retrieval
 - ✅ Protected routes and session persistence
+- ✅ Theme toggle component infrastructure
 
 **Backend Stack** (Integrated):
 - FastAPI for REST API
@@ -1033,8 +1159,12 @@ This project is licensed under the terms specified in the LICENSE file.
 - FAISS for vector similarity search
 - LangChain/LLM integration for RAG responses
 - JWT authentication middleware
+- GitHub OAuth integration endpoint
 
 **Recent Updates** (February 2026):
+- ✅ **GitHub OAuth authentication** - seamless GitHub login integration
+- ✅ **Profile dropdown component** - displays user info with avatar
+- ✅ **Theme toggle component** - infrastructure for light/dark mode switching
 - ✅ Implemented delete chat functionality with confirmation dialogs
 - ✅ Added automatic state synchronization on deletion
 - ✅ Fixed error messages in chat service
@@ -1116,7 +1246,7 @@ Question → Embedding → FAISS Search → Context Retrieval → LLM Prompt →
 **Database**: PostgreSQL (user data, chat sessions, messages)  
 **Vector Store**: FAISS (document embeddings, similarity search)  
 **RAG Framework**: LangChain + LLM integration  
-**Authentication**: JWT tokens  
+**Authentication**: JWT tokens + GitHub OAuth  
 
 ## 🙏 Acknowledgments
 
@@ -1126,9 +1256,11 @@ Question → Embedding → FAISS Search → Context Retrieval → LLM Prompt →
 - **Tailwind CSS** for utility-first styling
 - **Radix UI** for accessible component primitives
 - **shadcn/ui** for component patterns and inspiration
+- **Lucide React** for beautiful icons
 
 **Backend & AI**:
 - **FastAPI** for modern Python web framework
+- **GitHub** for OAuth authentication integration
 - **PostgreSQL** for reliable data persistence
 - **FAISS** (Facebook AI) for efficient vector similarity search
 - **LangChain** for RAG pipeline orchestration

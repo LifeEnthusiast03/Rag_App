@@ -332,7 +332,7 @@ export default function PDFChatInterface() {
                     </svg>
                   </div>
                   <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
-                    Chat with Your PDFs
+                    Readwise
                   </h1>
                   <p className="text-gray-400 text-xl">
                     Upload a document and start an intelligent conversation
