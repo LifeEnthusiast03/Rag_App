@@ -42,7 +42,9 @@ src/
 │   └── githubcallback.tsx     # GitHub OAuth callback handler
 │
 ├── components/
-│   ├── profile-dropdown.tsx   # User menu with stats, copyable fields, sign-out
+│   ├── profile-dropdown.tsx   # User menu — sidebar footer (placement="sidebar") or header
+│   │                          #   placement="sidebar": full-width trigger, opens upward
+│   │                          #   placement="header":  compact trigger, opens downward-right
 │   ├── theme-toggle.tsx       # Sun/Moon toggle (dark ↔ light)
 │   ├── theme-provider.tsx     # React context for dark/light theme
 │   └── login-form.tsx         # Reusable form component
@@ -78,18 +80,31 @@ src/
 - Real-time confirm-password match indicator
 
 ### Main Dashboard
-- **PDF upload** — click-to-browse or drag-and-drop, up to 50 MB
+- **PDF upload** — click-to-browse or drag-and-drop; **multiple PDFs** supported in a single session
+  - Accepts multiple files at once from the file picker or via drag-and-drop
+  - Merges newly selected files into the existing queue (no duplicates by name + size)
+  - Per-file remove button (`×`) and a "Clear all" shortcut
+  - Scrollable file list capped at visible height when many files are queued
+  - Non-PDF files silently filtered with a warning count; valid PDFs are still kept
+  - Chat header summarises uploaded set: `document.pdf +2 more` when multiple files sent
 - **Sidebar** — conversation history with hover-reveal delete, active item accent
+  - **Profile section pinned at the bottom** of the sidebar (below the chat list), replacing the old static footer
+  - Clicking the profile button opens a dropdown that floats **upward** so it never clips at the bottom of the viewport
 - **Structured AI responses** parsed from JSON:
   - `answer` — main response text
   - `key_points` — collapsible bullet list
   - `confidence_level` — monospace badge (LOW / MEDIUM / HIGH)
   - `sources_cited` — numbered source list
   - `follow_up_suggestions` — horizontal-scroll chips; clicking sends the suggestion
+- **Copy message** — every AI response has a hover-reveal copy button beneath it
+  - Copies plain text (or just the `answer` field for structured JSON responses)
+  - Icon swaps `Copy → Check` for 2 seconds on success, then reverts
+  - Only shown on assistant messages, never on user bubbles
 - **Auto-growing textarea** (1–6 rows), Enter to send, Shift+Enter for newline
 - Typing indicator while AI is responding
 
 ### Profile Dropdown
+- Now lives in the **sidebar footer** (`placement="sidebar"`) — full-width trigger, dropdown opens upward
 - Gradient avatar with initials
 - Stats: conversation count + member year
 - Copyable username, email, user ID (clipboard icon reveals on hover, Check on success)

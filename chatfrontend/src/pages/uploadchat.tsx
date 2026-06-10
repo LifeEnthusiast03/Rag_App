@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   Plus, FileText, Trash2, Upload, Zap, ArrowUp, X,
-  ChevronDown, Menu,
+  ChevronDown, Menu, Copy, Check,
 } from 'lucide-react';
 import { useAuthContext } from '@/hooks/useauth';
 import { useChat } from '@/hooks/usechat';
@@ -145,6 +145,7 @@ export default function PDFChatInterface() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -186,13 +187,25 @@ export default function PDFChatInterface() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     const pdfFiles = selectedFiles.filter((f: File) => f.type === 'application/pdf');
+    const skipped = selectedFiles.length - pdfFiles.length;
     if (pdfFiles.length === 0) {
-      setError('Please select a valid PDF file');
+      setError('Please select valid PDF files');
       setFiles([]);
     } else {
-      setFiles(pdfFiles);
-      setError(null);
+      setFiles(prev => {
+        // Merge new files, avoiding duplicates by name+size
+        const existing = new Set(prev.map(f => `${f.name}-${f.size}`));
+        const merged = [...prev, ...pdfFiles.filter(f => !existing.has(`${f.name}-${f.size}`))];
+        return merged;
+      });
+      setError(skipped > 0 ? `${skipped} non-PDF file${skipped > 1 ? 's' : ''} were ignored` : null);
     }
+    // Reset input so the same file can be re-added after removal
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleUpload = async () => {
@@ -212,7 +225,9 @@ export default function PDFChatInterface() {
       const data = await res.json();
       if (data.chat_id) {
         setCurChatId(data.chat_id);
-        setUploadedFileName(files[0].name);
+        const firstName = files[0].name;
+        const extra = files.length - 1;
+        setUploadedFileName(extra > 0 ? `${firstName} +${extra} more` : firstName);
         setChatHistory([]);
         setUserChats([{ chat_id: data.chat_id, chat_name: data.chat_name }, ...userChats]);
         setFiles([]);
@@ -298,8 +313,13 @@ export default function PDFChatInterface() {
     e.preventDefault();
     setIsDragOver(false);
     const dropped = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
-    if (dropped.length) { setFiles(dropped); setError(null); }
-    else setError('Please drop a valid PDF file');
+    if (dropped.length) {
+      setFiles(prev => {
+        const existing = new Set(prev.map(f => `${f.name}-${f.size}`));
+        return [...prev, ...dropped.filter(f => !existing.has(`${f.name}-${f.size}`))];
+      });
+      setError(null);
+    } else setError('Please drop valid PDF files');
   };
 
   /* ─── Sidebar item ────────────────────────────────────────────── */
@@ -332,10 +352,7 @@ export default function PDFChatInterface() {
     );
   };
 
-  /* ── initials helper ─────────────────────────────────────────── */
-  const { user } = useAuthContext();
-  const getInitials = (name: string) =>
-    name ? name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?';
+
 
   /* ═══════════════════════════════════════════════════════════════
      RENDER
@@ -375,24 +392,9 @@ export default function PDFChatInterface() {
           )}
         </nav>
 
-        {/* Sidebar footer */}
-        <div className="mt-auto">
-          <div className="border-t border-[var(--color-border)]" />
-          <div className="px-4 py-3 flex items-center gap-3">
-            {/* Avatar */}
-            <div className="w-7 h-7 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
-              {getInitials(user.user_name)}
-            </div>
-            {/* Username */}
-            <span className="text-sm text-[var(--color-text-primary)] truncate flex-1 min-w-0">
-              {user.user_name}
-            </span>
-            {/* Status */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]" />
-              <span className="text-[10px] font-mono text-[var(--color-text-muted)]">Connected</span>
-            </div>
-          </div>
+        {/* Sidebar footer — profile */}
+        <div className="mt-auto border-t border-[var(--color-border)] p-3">
+          <ProfileDropdown placement="sidebar" />
         </div>
       </aside>
 
@@ -433,7 +435,6 @@ export default function PDFChatInterface() {
                 <X size={13} />
               </button>
             )}
-            <ProfileDropdown />
           </div>
         </header>
 
@@ -472,31 +473,52 @@ export default function PDFChatInterface() {
                   id="fileInput"
                   type="file"
                   accept=".pdf"
+                  multiple
                   onChange={handleFileChange}
                   className="hidden"
                 />
                 <Upload size={32} className="text-[var(--color-accent)]" />
                 <div className="text-center">
-                  <p className="text-sm font-medium text-[var(--color-text-primary)]">Drop your PDF here</p>
-                  <p className="text-sm text-[var(--color-text-muted)] mt-0.5">or click to browse</p>
+                  <p className="text-sm font-medium text-[var(--color-text-primary)]">Drop your PDFs here</p>
+                  <p className="text-sm text-[var(--color-text-muted)] mt-0.5">or click to browse · multiple files supported</p>
                 </div>
-                <p className="font-mono text-xs text-[var(--color-text-hint)]">Supports PDF files up to 50MB</p>
+                <p className="font-mono text-xs text-[var(--color-text-hint)]">Supports multiple PDF files up to 50MB each</p>
               </div>
 
-              {/* Selected file preview */}
+              {/* Selected files list */}
               {files.length > 0 && (
-                <div className="w-full max-w-lg mt-3 px-4 py-3 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg flex items-center gap-3">
-                  <FileText size={16} className="text-[var(--color-accent)] flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-[var(--color-text-primary)] truncate">{files[0].name}</p>
-                    <p className="font-mono text-[10px] text-[var(--color-text-hint)]">{formatBytes(files[0].size)}</p>
+                <div className="w-full max-w-lg mt-3 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg overflow-hidden">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--color-border)]">
+                    <span className="text-[10px] font-mono text-[var(--color-text-hint)] uppercase tracking-widest">
+                      {files.length} file{files.length > 1 ? 's' : ''} selected
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setFiles([]); }}
+                      className="text-[10px] font-mono text-[var(--color-text-hint)] hover:text-red-400 transition-colors"
+                    >
+                      Clear all
+                    </button>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setFiles([]); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                    className="text-[var(--color-text-hint)] hover:text-red-400 transition-colors flex-shrink-0"
-                  >
-                    <X size={14} />
-                  </button>
+                  {/* File rows — scrollable if many */}
+                  <div className="max-h-40 overflow-y-auto divide-y divide-[var(--color-border)]">
+                    {files.map((file, i) => (
+                      <div key={`${file.name}-${file.size}`} className="flex items-center gap-2.5 px-3 py-2">
+                        <FileText size={13} className="text-[var(--color-accent)] flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-[var(--color-text-primary)] truncate">{file.name}</p>
+                          <p className="font-mono text-[10px] text-[var(--color-text-hint)]">{formatBytes(file.size)}</p>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeFile(i); }}
+                          className="flex-shrink-0 text-[var(--color-text-hint)] hover:text-red-400 transition-colors p-0.5 rounded"
+                          title="Remove file"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -579,7 +601,7 @@ export default function PDFChatInterface() {
                         </div>
                       ) : (
                         /* AI — no bubble */
-                        <div className="max-w-[80%]">
+                        <div className="group/msg max-w-[80%]">
                           <p className="text-[10px] font-mono text-[var(--color-text-hint)] mb-1.5 uppercase tracking-widest">
                             Readwise
                           </p>
@@ -593,6 +615,33 @@ export default function PDFChatInterface() {
                               {msg.content}
                             </p>
                           )}
+                          {/* Copy button */}
+                          <button
+                            onClick={async () => {
+                              try {
+                                // For structured responses, copy only the plain answer text
+                                let textToCopy = msg.content;
+                                try {
+                                  const parsed = JSON.parse(msg.content);
+                                  if (parsed?.answer) textToCopy = parsed.answer;
+                                } catch { /* not JSON, use raw */ }
+                                await navigator.clipboard.writeText(textToCopy);
+                                setCopiedIndex(idx);
+                                setTimeout(() => setCopiedIndex(null), 2000);
+                              } catch { /* clipboard unavailable */ }
+                            }}
+                            className="mt-1.5 opacity-0 group-hover/msg:opacity-100 flex items-center gap-1 text-[var(--color-text-hint)] hover:text-[var(--color-text-primary)] transition-all duration-150"
+                            title={copiedIndex === idx ? 'Copied!' : 'Copy message'}
+                            aria-label="Copy message"
+                          >
+                            {copiedIndex === idx
+                              ? <Check size={12} className="text-[var(--color-success)]" />
+                              : <Copy size={12} />
+                            }
+                            <span className="text-[10px] font-mono">
+                              {copiedIndex === idx ? 'Copied' : 'Copy'}
+                            </span>
+                          </button>
                         </div>
                       )}
                     </div>
