@@ -65,9 +65,15 @@ interface getAllChatResponse{
     chats :chat[]
     Successful:boolean
 }
+interface Source {
+    filename: string;
+    page: number;
+}
+
 interface message{
     role:string
     content:string
+    sources?: Source[]
 }
 
 interface structuredChatResponse{
@@ -99,6 +105,7 @@ interface chatResponseFormat{
         timestamp: string
         sources_used: number
         error_message: string | null
+        sources?: Source[]
 }
 interface deletechatResponse{
             Successful:boolean
@@ -117,6 +124,7 @@ export type {loginForm,
             chat,
             getAllChatResponse,
             message,
+            Source,
             structuredChatResponse,
             conversationResponse,
             chatRequestFormat,

@@ -66,6 +66,9 @@ src/
 │
 └── type/
     └── types.ts               # All TypeScript interfaces
+                               #   Includes: Source { filename, page }
+                               #   message.sources?: Source[]
+                               #   chatResponseFormat.sources?: Source[]
 ```
 
 ---
@@ -96,6 +99,11 @@ src/
   - `confidence_level` — monospace badge (LOW / MEDIUM / HIGH)
   - `sources_cited` — numbered source list
   - `follow_up_suggestions` — horizontal-scroll chips; clicking sends the suggestion
+- **Source citation pills** — appear beneath every assistant response that has traceable sources
+  - Each pill shows `📄 filename.pdf • p.N` using a `FileText` icon
+  - Sourced from the `/chat` response's `sources` array (`{ filename, page }[]`)
+  - Pills are displayed in a wrapping flex row with muted styling (`bg-gray-800`, `border-gray-700`)
+  - Only rendered when the backend returns at least one source; hidden otherwise
 - **Copy message** — every AI response has a hover-reveal copy button beneath it
   - Copies plain text (or just the `answer` field for structured JSON responses)
   - Icon swaps `Copy → Check` for 2 seconds on success, then reverts
@@ -147,7 +155,7 @@ The frontend communicates with a FastAPI backend running at `http://localhost:80
 | `/signup` | POST | User registration |
 | `/githublogin` | GET | GitHub OAuth redirect |
 | `/upload-pdfs` | POST | Upload PDF → returns `chat_id` |
-| `/chat` | POST | Send question → structured JSON response |
+| `/chat` | POST | Send question → structured JSON response + `sources` array |
 | `/getchat` | GET | List all chats for the user |
 | `/getchatconversation?chatid=` | GET | Load message history |
 | `/deletechat?chatid=` | DELETE | Remove a conversation |

@@ -254,7 +254,7 @@ export default function PDFChatInterface() {
     try {
       const data = await chatreq({ chat_id: curChatId, question: userMessage, chat_history: chatHistory }, token);
       if (data.success) {
-        setChatHistory([...updatedHistory, { role: data.role || 'assistant', content: data.response }]);
+        setChatHistory([...updatedHistory, { role: data.role || 'assistant', content: data.response, sources: data.sources ?? [] }]);
         setError(null);
       } else {
         setError(data.error_message || 'Failed to get response');
@@ -642,6 +642,20 @@ export default function PDFChatInterface() {
                               {copiedIndex === idx ? 'Copied' : 'Copy'}
                             </span>
                           </button>
+                          {/* Source citation pills */}
+                          {msg.sources && msg.sources.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2 ml-2">
+                              {msg.sources.map((src, i) => (
+                                <span
+                                  key={i}
+                                  className="flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-gray-800 text-gray-400 border border-gray-700"
+                                >
+                                  <FileText size={12} aria-hidden="true" />
+                                  {src.filename} • p.{src.page}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
