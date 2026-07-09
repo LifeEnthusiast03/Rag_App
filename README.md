@@ -8,13 +8,15 @@ This is a production-ready full-stack RAG (Retrieval-Augmented Generation) appli
 
 **Key Capabilities**:
 - 📄 Upload multiple PDF documents with automatic processing
+- 📖 Side-by-side split-screen PDF viewer with document navigation
 - 💬 Intelligent conversations with PDFs using AI-powered RAG responses
+- 🎯 Interactive source citations that jump directly to the cited PDF page
 - 🔐 Secure authentication with JWT tokens (Email/Password + GitHub OAuth)
 - 👤 Profile dropdown with user information display
 - 📚 Manage multiple conversations seamlessly
 - 🗑️ Delete conversations with confirmation dialogs
 - 💾 Persistent chat history in PostgreSQL database
-- 🎨 Modern, responsive dark UI with smooth interactions
+- 🎨 Modern, responsive dark UI with smooth interactions and simulated streaming
 - 🔍 FAISS vector similarity search for accurate context retrieval
 - 🌓 Theme toggle infrastructure for dark/light modes
 
@@ -58,12 +60,15 @@ This is a production-ready full-stack RAG (Retrieval-Augmented Generation) appli
 ### PDF Document Management
 - **PDF Upload**: Upload PDF files with validation
 - **File Type Validation**: Client-side PDF type checking
-- **Multi-file Support**: Handle multiple PDF documents
+- **Multi-file Support**: Handle multiple PDF documents seamlessly with a header dropdown menu
+- **Integrated PDF Viewer**: Side-by-side split-screen interface using `react-pdf` to read documents alongside the chat
 - **Upload Progress**: Visual feedback during file uploads
 - **Automatic Chat Creation**: Each PDF upload creates a new chat session
 
 ### Chat Interface
 - **Interactive Q&A**: Ask questions and get AI-powered answers about uploaded documents
+- **Simulated Streaming**: Real-time typing effect for AI responses to simulate natural conversation flow
+- **Interactive Citations**: Clickable source pills that automatically open the PDF and jump to the cited page
 - **Chat History Persistence**: All conversations saved to backend database
 - **Multi-conversation Support**: Manage and switch between multiple PDF chat sessions
 - **Conversation Sidebar**: Collapsible sidebar displaying all user chat sessions
@@ -1162,6 +1167,9 @@ This project is licensed under the terms specified in the LICENSE file.
 - GitHub OAuth integration endpoint
 
 **Recent Updates** (February 2026):
+- ✅ **Integrated PDF Viewer** - side-by-side reading with document navigation using `react-pdf`
+- ✅ **Interactive Source Pills** - clickable citations that jump directly to the referenced page
+- ✅ **Simulated Streaming UI** - real-time typing effect for AI responses with robust structured JSON parsing
 - ✅ **GitHub OAuth authentication** - seamless GitHub login integration
 - ✅ **Profile dropdown component** - displays user info with avatar
 - ✅ **Theme toggle component** - infrastructure for light/dark mode switching
