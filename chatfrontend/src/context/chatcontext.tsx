@@ -1,6 +1,6 @@
-import { getAllChats,getChatConversation,deletechat } from "@/service/chatservice";
+import { getAllChats,getChatConversation,deletechat,renameChat as renameChatApi } from "@/service/chatservice";
 import {createContext,useEffect, useState} from "react"
-import type { chat,message,deletechatResponse } from "@/type/types";
+import type { chat,message,deletechatResponse,renameChatResponse } from "@/type/types";
 import type { ReactNode } from "react";
 import { useAuthContext } from "@/hooks/useauth";
 
@@ -11,6 +11,7 @@ interface chatcontextType{
     setUserChats:(chats:chat[])=>void
     getChatconversation:(chatid:number)=>Promise<message[]>
     deleteChat:(chatid:number)=>Promise<deletechatResponse>
+    renameChat:(chatid:number, newName:string)=>Promise<renameChatResponse>
     loading:boolean
 }
 interface chatProviderProp{
@@ -91,6 +92,29 @@ export const ChatContextProvider = ({children}:chatProviderProp)=>{
                             }
                     }
             }
+            const renameChat = async(chatid:number, newName:string):Promise<renameChatResponse>=>
+            {
+                    try{
+                        const data = await renameChatApi(token,{chat_id:chatid, chat_name:newName});
+                        if(data.Successful){
+                            setUserChats(prevChats => prevChats.map(chat =>
+                                chat.chat_id === chatid ? {...chat, chat_name: newName} : chat
+                            ))
+                            return data
+                        }
+                        return {
+                            Successful: false,
+                            message: data.message || "Failed to rename chat"
+                        }
+                    }
+                    catch(e){
+                            console.error("Failed to rename chat:", e)
+                            return {
+                                Successful:false,
+                                message:"Failed to rename chat"
+                            }
+                    }
+            }
             return (
                 <ChatContext.Provider value={{
                     curChatId,
@@ -99,6 +123,7 @@ export const ChatContextProvider = ({children}:chatProviderProp)=>{
                     setUserChats,
                     getChatconversation,
                     deleteChat,
+                    renameChat,
                     loading
                 }}>
                     {children}

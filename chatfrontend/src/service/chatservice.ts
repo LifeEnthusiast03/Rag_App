@@ -1,5 +1,5 @@
 
-import type { getAllChatResponse,conversationResponse,chatRequestFormat,chatResponseFormat,deletechatResponse } from "@/type/types";
+import type { getAllChatResponse,conversationResponse,chatRequestFormat,chatResponseFormat,deletechatResponse,renameChatRequest,renameChatResponse } from "@/type/types";
 const getAllChats = async(token:string):Promise<getAllChatResponse>=>{
     try{
         const authHeader = "Bearer "+token
@@ -89,4 +89,28 @@ const deletechat = async(token:string,chatid:number):Promise<deletechatResponse>
                 throw e
         }
 }
-export {getAllChats,getChatConversation,chatreq,deletechat}
+
+const renameChat = async(token:string, req:renameChatRequest):Promise<renameChatResponse>=>{
+        try{
+                const authHeader = "Bearer "+token
+                const response = await fetch(`http://localhost:8000/renamechat`,{
+                    method:"PATCH",
+                    headers:{
+                        "content-type":"application/json",
+                        "Authorization":authHeader
+                    },
+                    body:JSON.stringify(req)
+                });
+            if(!(response.ok)){
+                    throw new Error("failed to rename chat")
+            }
+            const data = await response.json();
+                return data
+        }
+        catch(e){
+                console.error("failed to rename chat")
+                throw e
+        }
+}
+
+export {getAllChats,getChatConversation,chatreq,deletechat,renameChat}
