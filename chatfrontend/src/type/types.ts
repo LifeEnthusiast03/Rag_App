@@ -74,6 +74,9 @@ interface message{
     role:string
     content:string
     sources?: Source[]
+    key_points?: string[] | null
+    sources_cited?: string[] | null
+    follow_up_suggestions?: string[] | null
 }
 
 interface structuredChatResponse{
@@ -100,16 +103,29 @@ interface chatRequestFormat{
 interface chatResponseFormat{
         success: boolean
         chat_id: number
-        response: string  // JSON stringified structured response
+        response: string
         role: string
         timestamp: string
         sources_used: number
         error_message: string | null
         sources?: Source[]
+        key_points?: string[] | null
+        sources_cited?: string[] | null
+        follow_up_suggestions?: string[] | null
 }
 interface deletechatResponse{
             Successful:boolean
             message:string
+}
+interface renameChatRequest{
+    chat_id:number
+    chat_name:string
+}
+interface renameChatResponse{
+    Successful:boolean
+    message:string
+    chat_id?:number
+    chat_name?:string
 }
 export type {loginForm,
             signupForm,
@@ -129,4 +145,6 @@ export type {loginForm,
             conversationResponse,
             chatRequestFormat,
             chatResponseFormat,
-            deletechatResponse}
+            deletechatResponse,
+            renameChatRequest,
+            renameChatResponse}

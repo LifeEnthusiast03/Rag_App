@@ -1,57 +1,154 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Document, Page, pdfjs } from "react-pdf"
+import "react-pdf/dist/Page/TextLayer.css"
 import {
   Plus, FileText, Trash2, Upload, Zap, ArrowUp, X,
-  ChevronDown, Menu, Copy, Check,
+  ChevronDown, Menu, Copy, Check, Pencil, Search,
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useAuthContext } from '@/hooks/useauth';
 import { useChat } from '@/hooks/usechat';
 import { chatreq } from '@/service/chatservice';
-import type { message, structuredChatResponse } from '@/type/types';
+import type { message } from '@/type/types';
 import ProfileDropdown from '@/components/profile-dropdown';
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
+
+/* ─── Markdown renderer with styled elements ─────────────────── */
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        p: ({ children }) => (
+          <p className="text-sm leading-relaxed text-[var(--color-text-primary)] mb-2 last:mb-0">
+            {children}
+          </p>
+        ),
+        h1: ({ children }) => (
+          <h1 className="text-base font-bold text-[var(--color-text-primary)] mt-3 mb-1.5 border-b border-[var(--color-border)] pb-1">
+            {children}
+          </h1>
+        ),
+        h2: ({ children }) => (
+          <h2 className="text-sm font-bold text-[var(--color-text-primary)] mt-3 mb-1.5">
+            {children}
+          </h2>
+        ),
+        h3: ({ children }) => (
+          <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mt-2 mb-1">
+            {children}
+          </h3>
+        ),
+        ul: ({ children }) => (
+          <ul className="space-y-1 my-2 pl-4 text-sm text-[var(--color-text-primary)]">
+            {children}
+          </ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="space-y-1 my-2 pl-4 list-decimal text-sm text-[var(--color-text-primary)]">
+            {children}
+          </ol>
+        ),
+        li: ({ children }) => (
+          <li className="flex gap-2 leading-relaxed">
+            <span className="text-[var(--color-accent)] flex-shrink-0 mt-[3px]">•</span>
+            <span>{children}</span>
+          </li>
+        ),
+        strong: ({ children }) => (
+          <strong className="font-semibold text-[var(--color-text-primary)]">{children}</strong>
+        ),
+        em: ({ children }) => (
+          <em className="italic text-[var(--color-text-muted)]">{children}</em>
+        ),
+        code: ({ className, children, ...props }) => {
+          const isBlock = className?.includes('language-');
+          return isBlock ? (
+            <code
+              className="block bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-md px-3 py-2.5 text-xs font-mono text-[var(--color-text-primary)] overflow-x-auto my-2 whitespace-pre"
+              {...props}
+            >
+              {children}
+            </code>
+          ) : (
+            <code
+              className="bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded px-1.5 py-0.5 text-[11px] font-mono text-[var(--color-accent)]"
+              {...props}
+            >
+              {children}
+            </code>
+          );
+        },
+        pre: ({ children }) => (
+          <pre className="bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-lg my-2 overflow-x-auto">
+            {children}
+          </pre>
+        ),
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-2 border-[var(--color-accent)] pl-3 my-2 text-sm text-[var(--color-text-muted)] italic">
+            {children}
+          </blockquote>
+        ),
+        table: ({ children }) => (
+          <div className="overflow-x-auto my-2">
+            <table className="text-xs w-full border-collapse border border-[var(--color-border)] rounded-lg overflow-hidden">
+              {children}
+            </table>
+          </div>
+        ),
+        th: ({ children }) => (
+          <th className="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] px-3 py-1.5 text-left font-semibold text-[var(--color-text-primary)]">
+            {children}
+          </th>
+        ),
+        td: ({ children }) => (
+          <td className="border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-muted)]">
+            {children}
+          </td>
+        ),
+        hr: () => <hr className="border-[var(--color-border)] my-3" />,
+        a: ({ href, children }) => (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[var(--color-accent)] underline underline-offset-2 hover:opacity-80 transition-opacity"
+          >
+            {children}
+          </a>
+        ),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
 
 /* ─── Structured AI response renderer ───────────────────────── */
 interface StructuredAIMessageProps {
-  content: string;
+  msg: message;
   onSuggestionClick: (text: string) => void;
 }
 
-function StructuredAIMessage({ content, onSuggestionClick }: StructuredAIMessageProps) {
+function StructuredAIMessage({ msg, onSuggestionClick }: StructuredAIMessageProps) {
   const [keyPointsOpen, setKeyPointsOpen] = useState(false);
 
-  let structured: structuredChatResponse | null = null;
-  try {
-    const parsed = JSON.parse(content);
-    if (parsed && typeof parsed === 'object' && 'answer' in parsed) {
-      structured = parsed as structuredChatResponse;
-    }
-  } catch {
-    // fall through to plain text
-  }
-
-  if (!structured) {
-    return (
-      <p className="text-sm leading-relaxed text-[var(--color-text-primary)] whitespace-pre-wrap">
-        {content}
-      </p>
-    );
-  }
+  const hasKeyPoints = msg.key_points && msg.key_points.length > 0;
+  const hasSources   = msg.sources_cited && msg.sources_cited.length > 0;
+  const hasSuggestions = msg.follow_up_suggestions && msg.follow_up_suggestions.length > 0;
 
   return (
     <div className="space-y-3">
-      {/* Answer */}
-      <p className="text-sm leading-relaxed text-[var(--color-text-primary)] whitespace-pre-wrap">
-        {structured.answer}
-      </p>
-
-      {/* Confidence badge */}
-      {structured.confidence_level && (
-        <span className="font-mono text-[10px] text-[var(--color-text-hint)] inline-block">
-          confidence: {structured.confidence_level.toUpperCase()}
-        </span>
-      )}
+      {/* Answer — always rendered as markdown */}
+      <MarkdownContent content={msg.content} />
 
       {/* Key Points collapsible */}
-      {structured.key_points && structured.key_points.length > 0 && (
+      {hasKeyPoints && (
         <div>
           <button
             onClick={() => setKeyPointsOpen(!keyPointsOpen)}
@@ -61,11 +158,11 @@ function StructuredAIMessage({ content, onSuggestionClick }: StructuredAIMessage
               size={12}
               className={`transition-transform duration-200 ${keyPointsOpen ? 'rotate-180' : ''}`}
             />
-            Key points ({structured.key_points.length})
+            Key points ({msg.key_points!.length})
           </button>
           {keyPointsOpen && (
             <ul className="mt-2 space-y-1.5 pl-3 border-l border-[var(--color-border)]">
-              {structured.key_points.map((point, i) => (
+              {msg.key_points!.map((point, i) => (
                 <li key={i} className="flex gap-2 text-xs text-[var(--color-text-muted)]">
                   <span className="text-[var(--color-text-hint)] flex-shrink-0">•</span>
                   <span>{point}</span>
@@ -76,20 +173,10 @@ function StructuredAIMessage({ content, onSuggestionClick }: StructuredAIMessage
         </div>
       )}
 
-      {/* Clarification needed */}
-      {structured.needs_clarification && structured.clarification_needed && (
-        <div className="border border-[var(--color-border)] rounded-lg px-3 py-2.5">
-          <p className="text-xs text-[var(--color-text-muted)]">
-            <span className="font-medium text-[var(--color-text-primary)]">Clarification: </span>
-            {structured.clarification_needed}
-          </p>
-        </div>
-      )}
-
-      {/* Sources */}
-      {structured.sources_cited && structured.sources_cited.length > 0 && (
+      {/* Sources cited */}
+      {hasSources && (
         <div className="space-y-0.5">
-          {structured.sources_cited.map((source, i) => (
+          {msg.sources_cited!.map((source, i) => (
             <p key={i} className="text-xs text-[var(--color-text-muted)]">
               {i + 1}. {source}
             </p>
@@ -98,9 +185,9 @@ function StructuredAIMessage({ content, onSuggestionClick }: StructuredAIMessage
       )}
 
       {/* Follow-up suggestion chips */}
-      {structured.follow_up_suggestions && structured.follow_up_suggestions.length > 0 && (
+      {hasSuggestions && (
         <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5 pt-1">
-          {structured.follow_up_suggestions.map((s, i) => (
+          {msg.follow_up_suggestions!.map((s, i) => (
             <button
               key={i}
               onClick={() => onSuggestionClick(s)}
@@ -146,13 +233,22 @@ export default function PDFChatInterface() {
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfPage, setPdfPage] = useState<number>(1);
+  const [pdfNumPages, setPdfNumPages] = useState<number>(0);
+  const [activePdfFilename, setActivePdfFilename] = useState<string>("");
+  const [chatPdfs, setChatPdfs] = useState<string[]>([]);
+  const [pdfMenuOpen, setPdfMenuOpen] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { token } = useAuthContext();
-  const { curChatId, setCurChatId, userChats, getChatconversation, setUserChats, deleteChat } = useChat();
+  const { curChatId, setCurChatId, userChats, getChatconversation, setUserChats, deleteChat, renameChat } = useChat();
 
   /* ── scroll to bottom ────────────────────────────────────────── */
   useEffect(() => {
@@ -165,16 +261,29 @@ export default function PDFChatInterface() {
     el.style.height = `${Math.min(el.scrollHeight, 144)}px`;
   };
 
-  /* ── helpers (unchanged) ─────────────────────────────────────── */
-  const isStructuredResponse = (content: string): boolean => {
-    try {
-      const parsed = JSON.parse(content);
-      return parsed && typeof parsed === 'object' && 'answer' in parsed;
-    } catch {
-      return false;
-    }
-  };
+  const openPdf = useCallback(async (filename: string, page: number = 1) => {
+    const response = await fetch(
+      `http://localhost:8000/pdf/download?chatid=${curChatId}&filename=${filename}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!response.ok) return;
 
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+
+    setPdfUrl(url);
+    setPdfPage(page);
+    setActivePdfFilename(filename);
+    setPdfOpen(true);
+  }, [curChatId, token, pdfUrl]);
+
+  useEffect(() => {
+    return () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); };
+  }, [pdfUrl]);
+
+  /* ── helpers (unchanged) ─────────────────────────────────────── */
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -254,15 +363,65 @@ export default function PDFChatInterface() {
     try {
       const data = await chatreq({ chat_id: curChatId, question: userMessage, chat_history: chatHistory }, token);
       if (data.success) {
-        setChatHistory([...updatedHistory, { role: data.role || 'assistant', content: data.response, sources: data.sources ?? [] }]);
+        setIsChatting(false); // turn off typing indicator
+        
+        let parsedText = data.response || '';
+        let keyPoints = data.key_points ?? null;
+        let sourcesCited = data.sources_cited ?? null;
+        let followUpSuggestions = data.follow_up_suggestions ?? null;
+
+        try {
+          const parsed = JSON.parse(data.response);
+          if (parsed && typeof parsed.answer === 'string') {
+            parsedText = parsed.answer;
+            keyPoints = parsed.key_points || keyPoints;
+            sourcesCited = parsed.sources_cited || sourcesCited;
+            followUpSuggestions = parsed.follow_up_suggestions || followUpSuggestions;
+          }
+        } catch (e) {
+          // not JSON, leave it as is
+        }
+
+        const fullText = parsedText;
+        let index = 0;
+        
+        // Add message with empty content first
+        const baseMessage: message = {
+          role: data.role || 'assistant',
+          content: '',
+          sources: data.sources ?? [],
+          key_points: keyPoints,
+          sources_cited: sourcesCited,
+          follow_up_suggestions: followUpSuggestions,
+        };
+        
+        setChatHistory(prev => [...prev, baseMessage]);
+        
+        // Stream content
+        const interval = setInterval(() => {
+          if (index < fullText.length) {
+            index += 5; // adjust chunk size for speed
+            setChatHistory(prev => {
+              const newHistory = [...prev];
+              newHistory[newHistory.length - 1] = {
+                ...newHistory[newHistory.length - 1],
+                content: fullText.substring(0, index)
+              };
+              return newHistory;
+            });
+          } else {
+            clearInterval(interval);
+          }
+        }, 15); // ms per chunk
+        
         setError(null);
       } else {
+        setIsChatting(false);
         setError(data.error_message || 'Failed to get response');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Chat request failed');
-    } finally {
       setIsChatting(false);
+      setError(err instanceof Error ? err.message : 'Chat request failed');
     }
   };
 
@@ -286,6 +445,18 @@ export default function PDFChatInterface() {
       setUploadedFileName(chat_name);
       const messages = await getChatconversation(chat_id);
       setChatHistory(messages);
+
+      const res = await fetch(`http://localhost:8000/pdf?chatid=${chat_id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.Successful) {
+          setChatPdfs(data.files.map((f: any) => f.filename));
+        } else {
+          setChatPdfs([]);
+        }
+      }
     } catch {
       setError('Failed to load conversation');
       setChatHistory([]);
@@ -322,12 +493,53 @@ export default function PDFChatInterface() {
     } else setError('Please drop valid PDF files');
   };
 
-  /* ─── Sidebar item ────────────────────────────────────────────── */
+  /* ─── Sidebar item ───────────────────────────────────────── */
   const SidebarItem = ({ chat }: { chat: { chat_id: number; chat_name: string } }) => {
     const isActive = chat.chat_id === curChatId;
+    const [isRenaming, setIsRenaming] = useState(false);
+    const [renameValue, setRenameValue] = useState(chat.chat_name);
+    const [renaming, setRenaming] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Focus input when rename mode starts
+    useEffect(() => {
+      if (isRenaming) inputRef.current?.focus();
+    }, [isRenaming]);
+
+    const startRename = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setRenameValue(chat.chat_name);
+      setIsRenaming(true);
+    };
+
+    const commitRename = async () => {
+      const trimmed = renameValue.trim();
+      if (!trimmed || trimmed === chat.chat_name) { setIsRenaming(false); return; }
+      setRenaming(true);
+      try {
+        const result = await renameChat(chat.chat_id, trimmed);
+        if (result.Successful) {
+          // If this is the active chat, update the header filename too
+          if (chat.chat_id === curChatId) setUploadedFileName(trimmed);
+        } else {
+          setRenameValue(chat.chat_name); // revert on failure
+        }
+      } catch {
+        setRenameValue(chat.chat_name);
+      } finally {
+        setRenaming(false);
+        setIsRenaming(false);
+      }
+    };
+
+    const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+      if (e.key === 'Escape') { setIsRenaming(false); setRenameValue(chat.chat_name); }
+    };
+
     return (
       <div
-        onClick={() => loadChat(chat.chat_id, chat.chat_name)}
+        onClick={() => !isRenaming && loadChat(chat.chat_id, chat.chat_name)}
         className={`group relative flex items-center gap-2.5 px-3 py-2.5 mx-1 rounded-md cursor-pointer transition-colors ${
           isActive
             ? 'bg-[var(--color-bg-elevated)] border-l-2 border-[var(--color-accent)] rounded-l-none pl-[10px]'
@@ -338,16 +550,44 @@ export default function PDFChatInterface() {
           size={14}
           className={`flex-shrink-0 ${isActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'}`}
         />
-        <span className="font-mono text-xs text-[var(--color-text-primary)] truncate flex-1 min-w-0">
-          {chat.chat_name}
-        </span>
-        <button
-          onClick={(e) => handleDeleteChat(e, chat.chat_id)}
-          className="opacity-0 group-hover:opacity-100 flex-shrink-0 text-[var(--color-text-hint)] hover:text-red-400 transition-all p-0.5 rounded"
-          title="Delete conversation"
-        >
-          <Trash2 size={12} />
-        </button>
+
+        {isRenaming ? (
+          /* ── Inline rename input ── */
+          <input
+            ref={inputRef}
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={handleRenameKeyDown}
+            onBlur={commitRename}
+            disabled={renaming}
+            className="flex-1 min-w-0 bg-[var(--color-bg-base)] border border-[var(--color-border-focus)] rounded px-1.5 py-0.5 text-xs font-mono text-[var(--color-text-primary)] outline-none disabled:opacity-60"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span className="font-mono text-xs text-[var(--color-text-primary)] truncate flex-1 min-w-0">
+            {chat.chat_name}
+          </span>
+        )}
+
+        {/* Action buttons — visible on hover */}
+        {!isRenaming && (
+          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 flex-shrink-0 transition-opacity">
+            <button
+              onClick={startRename}
+              className="text-[var(--color-text-hint)] hover:text-[var(--color-accent)] transition-colors p-0.5 rounded"
+              title="Rename conversation"
+            >
+              <Pencil size={11} />
+            </button>
+            <button
+              onClick={(e) => handleDeleteChat(e, chat.chat_id)}
+              className="text-[var(--color-text-hint)] hover:text-red-400 transition-colors p-0.5 rounded"
+              title="Delete conversation"
+            >
+              <Trash2 size={11} />
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -375,21 +615,61 @@ export default function PDFChatInterface() {
           </button>
         </div>
 
+        {/* Search bar */}
+        <div className="mx-3 mb-2 relative">
+          <Search
+            size={13}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-hint)] pointer-events-none"
+          />
+          <input
+            id="sidebar-search"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search chats…"
+            className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-md pl-7 pr-7 py-1.5 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-hint)] focus:outline-none focus:border-[var(--color-border-focus)] transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-hint)] hover:text-[var(--color-text-muted)] transition-colors"
+              aria-label="Clear search"
+            >
+              <X size={11} />
+            </button>
+          )}
+        </div>
+
         {/* RECENT label */}
-        <p className="text-[10px] font-semibold tracking-widest text-[var(--color-text-hint)] uppercase px-4 pb-1 mt-2">
-          Recent
+        <p className="text-[10px] font-semibold tracking-widest text-[var(--color-text-hint)] uppercase px-4 pb-1 mt-1">
+          {searchQuery ? 'Results' : 'Recent'}
         </p>
 
         {/* Chat list */}
         <nav className="flex-1 overflow-y-auto py-1 space-y-0.5">
-          {userChats.length === 0 ? (
-            <div className="px-4 py-8 text-center">
-              <p className="text-xs text-[var(--color-text-hint)]">No conversations yet</p>
-              <p className="text-[10px] text-[var(--color-text-hint)] mt-1 font-mono">Upload a PDF to start</p>
-            </div>
-          ) : (
-            userChats.map((chat) => <SidebarItem key={chat.chat_id} chat={chat} />)
-          )}
+          {(() => {
+            const filtered = userChats.filter((chat) =>
+              chat.chat_name?.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            if (userChats.length === 0) {
+              return (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-xs text-[var(--color-text-hint)]">No conversations yet</p>
+                  <p className="text-[10px] text-[var(--color-text-hint)] mt-1 font-mono">Upload a PDF to start</p>
+                </div>
+              );
+            }
+            if (filtered.length === 0) {
+              return (
+                <div className="px-4 py-8 text-center">
+                  <Search size={16} className="text-[var(--color-text-hint)] mx-auto mb-2" />
+                  <p className="text-xs text-[var(--color-text-hint)]">No chats match</p>
+                  <p className="text-[10px] text-[var(--color-text-hint)] mt-1 font-mono">&ldquo;{searchQuery}&rdquo;</p>
+                </div>
+              );
+            }
+            return filtered.map((chat) => <SidebarItem key={chat.chat_id} chat={chat} />);
+          })()}
         </nav>
 
         {/* Sidebar footer — profile */}
@@ -416,9 +696,50 @@ export default function PDFChatInterface() {
           {curChatId !== 0 && (
             <div className="flex items-center gap-2.5 flex-1 min-w-0">
               <FileText size={14} className="text-[var(--color-text-muted)] flex-shrink-0" />
-              <span className="font-mono text-sm text-[var(--color-text-primary)] truncate">
+              <span className="font-mono text-sm text-[var(--color-text-primary)] truncate pr-2 border-r border-[var(--color-border)]">
                 {uploadedFileName}
               </span>
+              {chatPdfs.length > 0 && (
+                <div className="relative ml-1">
+                  <button
+                    onClick={() => setPdfMenuOpen(!pdfMenuOpen)}
+                    className="text-xs text-[var(--color-text-primary)] flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[var(--color-bg-elevated)] hover:bg-[var(--color-bg-base)] border border-[var(--color-border)] transition-colors"
+                  >
+                    <FileText size={12} className="text-[var(--color-accent)]" />
+                    <span>{chatPdfs.length} PDF{chatPdfs.length !== 1 ? 's' : ''}</span>
+                    <ChevronDown size={12} className={`transition-transform text-[var(--color-text-hint)] ${pdfMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {pdfMenuOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-10"
+                        onClick={() => setPdfMenuOpen(false)}
+                      />
+                      <div className="absolute top-full left-0 mt-1 w-64 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg shadow-xl z-20 py-1 overflow-hidden">
+                        <div className="px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-bg-base)]">
+                          <p className="text-[10px] font-semibold text-[var(--color-text-hint)] uppercase tracking-widest">Document Files</p>
+                        </div>
+                        <div className="max-h-60 overflow-y-auto">
+                          {chatPdfs.map(filename => (
+                            <button
+                              key={filename}
+                              onClick={() => {
+                                openPdf(filename, 1);
+                                setPdfMenuOpen(false);
+                              }}
+                              className="w-full text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-base)] px-3 py-2.5 flex items-center gap-2 transition-colors border-b border-[var(--color-border)] last:border-0"
+                            >
+                              <FileText size={12} className="text-[var(--color-text-muted)] flex-shrink-0" />
+                              <span className="truncate">{filename}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -554,7 +875,8 @@ export default function PDFChatInterface() {
 
           ) : (
             /* ══ CHAT STATE ══════════════════════════════════════════ */
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex overflow-hidden">
+              <div className={`${pdfOpen ? "w-1/2 border-r border-[var(--color-border)]" : "w-full"} flex flex-col overflow-hidden`} style={{transition: "width 0.2s ease"}}>
 
               {/* Messages area */}
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
@@ -605,27 +927,21 @@ export default function PDFChatInterface() {
                           <p className="text-[10px] font-mono text-[var(--color-text-hint)] mb-1.5 uppercase tracking-widest">
                             Readwise
                           </p>
-                          {isStructuredResponse(msg.content) ? (
+                          {(msg.key_points || msg.sources_cited || msg.follow_up_suggestions) ? (
                             <StructuredAIMessage
-                              content={msg.content}
+                              msg={msg}
                               onSuggestionClick={(text) => setCurrentQuestion(text)}
                             />
                           ) : (
-                            <p className="text-sm leading-relaxed text-[var(--color-text-primary)] whitespace-pre-wrap">
-                              {msg.content}
-                            </p>
+                            <div className="text-sm leading-relaxed">
+                              <MarkdownContent content={msg.content} />
+                            </div>
                           )}
                           {/* Copy button */}
                           <button
                             onClick={async () => {
                               try {
-                                // For structured responses, copy only the plain answer text
-                                let textToCopy = msg.content;
-                                try {
-                                  const parsed = JSON.parse(msg.content);
-                                  if (parsed?.answer) textToCopy = parsed.answer;
-                                } catch { /* not JSON, use raw */ }
-                                await navigator.clipboard.writeText(textToCopy);
+                                await navigator.clipboard.writeText(msg.content);
                                 setCopiedIndex(idx);
                                 setTimeout(() => setCopiedIndex(null), 2000);
                               } catch { /* clipboard unavailable */ }
@@ -646,13 +962,14 @@ export default function PDFChatInterface() {
                           {msg.sources && msg.sources.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-2 ml-2">
                               {msg.sources.map((src, i) => (
-                                <span
+                                <button
                                   key={i}
-                                  className="flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-gray-800 text-gray-400 border border-gray-700"
+                                  onClick={() => openPdf(src.filename, src.page)}
+                                  className="flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700 hover:text-gray-200 hover:border-gray-500 transition-colors cursor-pointer"
                                 >
                                   <FileText size={12} aria-hidden="true" />
                                   {src.filename} • p.{src.page}
-                                </span>
+                                </button>
                               ))}
                             </div>
                           )}
@@ -720,6 +1037,55 @@ export default function PDFChatInterface() {
                   </p>
                 </div>
               </div>
+              </div>
+              
+              {/* PDF viewer panel */}
+              {pdfOpen && (
+                <div className="w-1/2 flex flex-col bg-[var(--color-bg-base)] overflow-hidden border-l border-[var(--color-border)]">
+                  {/* Panel header */}
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--color-border)] flex-shrink-0">
+                    <span className="text-sm text-[var(--color-text-primary)] truncate">
+                      {activePdfFilename}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-[var(--color-text-hint)]">
+                        p.{pdfPage} / {pdfNumPages}
+                      </span>
+                      <button
+                        onClick={() => setPdfPage(p => Math.max(1, p - 1))}
+                        disabled={pdfPage <= 1}
+                        className="text-[var(--color-text-hint)] hover:text-[var(--color-text-primary)] disabled:opacity-30 text-sm px-1"
+                      >‹</button>
+                      <button
+                        onClick={() => setPdfPage(p => Math.min(pdfNumPages, p + 1))}
+                        disabled={pdfPage >= pdfNumPages}
+                        className="text-[var(--color-text-hint)] hover:text-[var(--color-text-primary)] disabled:opacity-30 text-sm px-1"
+                      >›</button>
+                      <button
+                        onClick={() => { setPdfOpen(false); setPdfUrl(null); }}
+                        className="text-[var(--color-text-hint)] hover:text-[var(--color-text-primary)] ml-2"
+                      >✕</button>
+                    </div>
+                  </div>
+                  {/* PDF document render */}
+                  <div className="flex-1 overflow-y-auto flex justify-center bg-[var(--color-bg-elevated)] p-2">
+                    {pdfUrl && (
+                      <Document
+                        file={pdfUrl}
+                        onLoadSuccess={({ numPages }) => setPdfNumPages(numPages)}
+                        loading={<div className="text-[var(--color-text-hint)] text-sm mt-8">Loading PDF...</div>}
+                      >
+                        <Page
+                          pageNumber={pdfPage}
+                          width={420}
+                          renderTextLayer={true}
+                          renderAnnotationLayer={false}
+                        />
+                      </Document>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
